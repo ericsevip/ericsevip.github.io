@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>给阿姨的信</title>
+    <style>
+        body {
+            font-family: "Noto Serif SC", serif;
+            background-color: #f9f5f1;
+            padding: 20px;
+            margin: 0;
+            color: #333;
+        }
+        .letter-container {
+            max-width: 800px;
+            margin: 50px auto;
+            background-color: #fff;
+            padding: 60px 80px;
+            border-radius: 8px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            position: relative;
+            line-height: 1.8;
+        }
+        .letter-container::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 100px;
+            height: 5px;
+            background-color: #e8c3a2;
+            border-radius: 0 0 5px 5px;
+        }
+        .salutation {
+            font-size: 1.5rem;
+            margin-bottom: 30px;
+            color: #5d4037;
+        }
+        .content p {
+            margin-bottom: 25px;
+            font-size: 1.1rem;
+            text-align: justify;
+        }
+        .date {
+            margin-top: 40px;
+            color: #795548;
+            font-style: italic;
+        }
+        @media (max-width: 600px) {
+            .letter-container {
+                padding: 30px 20px;
+            }
+            .salutation, .content p, .date {
+                font-size: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="letter-container">
+        <div class="salutation">亲爱的阿姨：</div>
+        
+        <div class="content">
+            <p>不知道您最近身体怎么样？算算日子，我都好久没回您那儿了，我特别想你。您是不是也常常念叨我呀？我可是天天都惦记着您呢。</p>
+            
+            <p>说起来，您一直都是个特别会过日子的人，这点我打小就知道。记得以前去您家，您总把好吃的留着给我们，自己却总说“不饿”；穿的衣服也是洗得发白了还舍不得换，买东西更是货比三家，一分钱都要掰成两半花。尤其是您那部旧手机，屏幕都裂了道缝，按键也不太灵了，我们说了好几次让您换，您总说“还能用，不用浪费”。</p>
+            
+            <p>这次我特地提前打听了好久，给您挑了一部新手机，以后您想我的时候，随时都能给我打视频电话，我还能教您用它看天气预报、听戏曲呢。您收到的时候可别舍不得用呀，这是我的一点心意，看到您用得方便，我才开心呢。</p>
+            
+            <p>您也要好好照顾自己，该花的钱别省着，身体好比啥都重要。</p>
+        </div>
+        
+        <div class="date">2025-7-18</div>
+    </div>
+</body>
+</html>
