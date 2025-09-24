@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NFC同学交易系统</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+            color: #333;
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .container {
+            width: 100%;
+            max-width: 500px;
+            background-color: white;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+            overflow: hidden;
+        }
+        
+        header {
+            background: linear-gradient(90deg, #2575fc 0%, #6a11cb 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        h1 {
+            font-size: 1.8rem;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            font-size: 1rem;
+            opacity: 0.9;
+        }
+        
+        .nfc-card {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            margin: 20px;
+            padding: 25px;
+            border-radius: 15px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .nfc-card:before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 5px;
+            background: linear-gradient(90deg, #2575fc 0%, #6a11cb 100%);
+        }
+        
+        .balance {
+            font-size: 3rem;
+            font-weight: bold;
+            margin: 15px 0;
+            color: #2575fc;
+        }
+        
+        .user-info {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+            font-size: 0.9rem;
+            color: #555;
+        }
+        
+        .controls {
+            padding: 0 20px 20px;
+        }
+        
+        .btn {
+            display: block;
+            width: 100%;
+            padding: 15px;
+            margin: 10px 0;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(90deg, #2575fc 0%, #6a11cb 100%);
+            color: white;
+        }
+        
+        .btn-secondary {
+            background: #f0f0f0;
+            color: #333;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 100;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .modal-content {
+            background-color: white;
+            padding: 25px;
+            border-radius: 15px;
+            width: 90%;
+            max-width: 400px;
+            box-shadow: 0 5px 25px rgba(0, 0, 0, 0.2);
+        }
+        
+        .modal h2 {
+            margin-bottom: 15px;
+            color: #2575fc;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        
+        input, select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 1rem;
+        }
+        
+        .modal-buttons {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 20px;
+        }
+        
+        .modal-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            flex: 1;
+            margin: 0 5px;
+        }
+        
+        .modal-btn.confirm {
+            background: #2575fc;
+            color: white;
+        }
+        
+        .modal-btn.cancel {
+            background: #f0f0f0;
+            color: #333;
+        }
+        
+        .history {
+            padding: 0 20px 20px;
+        }
+        
+        .history h2 {
+            margin-bottom: 15px;
+            color: #2575fc;
+            font-size: 1.3rem;
+        }
+        
+        .transaction-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+        
+        .transaction-item {
+            padding: 10px 15px;
+            border-left: 4px solid #2575fc;
+            background-color: #f9f9f9;
+            margin-bottom: 10px;
+            border-radius: 0 8px 8px 0;
+        }
+        
+        .transaction-type {
+            font-weight: bold;
+            color: #2575fc;
+        }
+        
+        .transaction-amount {
+            float: right;
+            font-weight: bold;
+        }
+        
+        .positive {
+            color: #2ecc71;
+        }
+        
+        .negative {
+            color: #e74c3c;
+        }
+        
+        .nfc-icon {
+            font-size: 3rem;
+            margin-bottom: 10px;
+            color: #2575fc;
+        }
+        
+        @media (max-width: 480px) {
+            .container {
+                border-radius: 10px;
+            }
+            
+            h1 {
+                font-size: 1.5rem;
+            }
+            
+            .balance {
+                font-size: 2.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>NFC同学交易系统</h1>
+            <p class="subtitle">模拟NFC标签交易 - 仅供演示使用</p>
+        </header>
+        
+        <div class="nfc-card">
+            <div class="nfc-icon">📱</div>
+            <h2>我的NFC标签</h2>
+            <div class="balance" id="balance">¥50.00</div>
+            <p>用户ID: <span id="user-id">STU2023001</span></p>
+            <div class="user-info">
+                <span>持有人: 张三</span>
+                <span>班级: 高三(2)班</span>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <button class="btn btn-primary" id="read-btn">读取NFC标签</button>
+            <button class="btn btn-secondary" id="add-value-btn">增值</button>
+            <button class="btn btn-secondary" id="transfer-btn">转账</button>
+        </div>
+        
+        <div class="history">
+            <h2>交易记录</h2>
+            <div class="transaction-list" id="transaction-list">
+                <div class="transaction-item">
+                    <span class="transaction-type">充值</span> 
+                    <span class="transaction-amount positive">+¥20.00</span>
+                    <div>2023-10-15 14:30</div>
+                </div>
+                <div class="transaction-item">
+                    <span class="transaction-type">转账给李四</span> 
+                    <span class="transaction-amount negative">-¥15.00</span>
+                    <div>2023-10-14 09:45</div>
+                </div>
+                <div class="transaction-item">
+                    <span class="transaction-type">充值</span> 
+                    <span class="transaction-amount positive">+¥30.00</span>
+                    <div>2023-10-10 16:20</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 增值模态框 -->
+    <div class="modal" id="add-value-modal">
+        <div class="modal-content">
+            <h2>增值操作</h2>
+            <div class="form-group">
+                <label for="amount">增值金额 (¥)</label>
+                <input type="number" id="amount" min="1" max="1000" value="10">
+            </div>
+            <div class="modal-buttons">
+                <button class="modal-btn cancel" id="cancel-add">取消</button>
+                <button class="modal-btn confirm" id="confirm-add">确认增值</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 转账模态框 -->
+    <div class="modal" id="transfer-modal">
+        <div class="modal-content">
+            <h2>转账操作</h2>
+            <div class="form-group">
+                <label for="recipient">收款人</label>
+                <select id="recipient">
+                    <option value="STU2023002">李四 - 高三(2)班</option>
+                    <option value="STU2023003">王五 - 高三(1)班</option>
+                    <option value="STU2023004">赵六 - 高三(3)班</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="transfer-amount">转账金额 (¥)</label>
+                <input type="number" id="transfer-amount" min="1" max="50" value="5">
+            </div>
+            <div class="modal-buttons">
+                <button class="modal-btn cancel" id="cancel-transfer">取消</button>
+                <button class="modal-btn confirm" id="confirm-transfer">确认转账</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- NFC读取提示 -->
+    <div class="modal" id="nfc-modal">
+        <div class="modal-content">
+            <h2>读取NFC标签</h2>
+            <p>请将NFC标签靠近设备背面...</p>
+            <div style="text-align: center; margin: 20px 0; font-size: 3rem;">📱</div>
+            <p id="nfc-status">等待读取中...</p>
+            <div class="modal-buttons">
+                <button class="modal-btn cancel" id="cancel-nfc">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 获取DOM元素
+        const balanceElement = document.getElementById('balance');
+        const readBtn = document.getElementById('read-btn');
+        const addValueBtn = document.getElementById('add-value-btn');
+        const transferBtn = document.getElementById('transfer-btn');
+        const addValueModal = document.getElementById('add-value-modal');
+        const transferModal = document.getElementById('transfer-modal');
+        const nfcModal = document.getElementById('nfc-modal');
+        const cancelAdd = document.getElementById('cancel-add');
+        const confirmAdd = document.getElementById('confirm-add');
+        const cancelTransfer = document.getElementById('cancel-transfer');
+        const confirmTransfer = document.getElementById('confirm-transfer');
+        const cancelNfc = document.getElementById('cancel-nfc');
+        const transactionList = document.getElementById('transaction-list');
+        const nfcStatus = document.getElementById('nfc-status');
+        
+        // 初始余额
+        let balance = 50.00;
+        
+        // 打开增值模态框
+        addValueBtn.addEventListener('click', () => {
+            addValueModal.style.display = 'flex';
+        });
+        
+        // 打开转账模态框
+        transferBtn.addEventListener('click', () => {
+            transferModal.style.display = 'flex';
+        });
+        
+        // 关闭增值模态框
+        cancelAdd.addEventListener('click', () => {
+            addValueModal.style.display = 'none';
+        });
+        
+        // 关闭转账模态框
+        cancelTransfer.addEventListener('click', () => {
+            transferModal.style.display = 'none';
+        });
+        
+        // 关闭NFC读取模态框
+        cancelNfc.addEventListener('click', () => {
+            nfcModal.style.display = 'none';
+        });
+        
+        // 确认增值
+        confirmAdd.addEventListener('click', () => {
+            const amount = parseFloat(document.getElementById('amount').value);
+            if (amount > 0) {
+                balance += amount;
+                updateBalance();
+                addTransaction('充值', amount, true);
+                addValueModal.style.display = 'none';
+                showMessage(`成功充值 ¥${amount.toFixed(2)}`);
+            }
+        });
+        
+        // 确认转账
+        confirmTransfer.addEventListener('click', () => {
+            const amount = parseFloat(document.getElementById('transfer-amount').value);
+            const recipientSelect = document.getElementById('recipient');
+            const recipientText = recipientSelect.options[recipientSelect.selectedIndex].text;
+            
+            if (amount > 0) {
+                if (amount > balance) {
+                    alert('余额不足！');
+                    return;
+                }
+                
+                balance -= amount;
+                updateBalance();
+                addTransaction(`转账给${recipientText.split(' - ')[0]}`, amount, false);
+                transferModal.style.display = 'none';
+                showMessage(`成功向${recipientText.split(' - ')[0]}转账 ¥${amount.toFixed(2)}`);
+            }
+        });
+        
+        // 模拟读取NFC标签
+        readBtn.addEventListener('click', () => {
+            nfcModal.style.display = 'flex';
+            nfcStatus.textContent = '等待读取中...';
+            
+            // 模拟NFC读取过程
+            setTimeout(() => {
+                nfcStatus.textContent = '检测到NFC标签...';
+                
+                setTimeout(() => {
+                    nfcStatus.innerHTML = '读取成功！<br>用户: 李四<br>余额: ¥35.00';
+                    
+                    setTimeout(() => {
+                        nfcModal.style.display = 'none';
+                        showMessage('NFC标签读取成功！');
+                    }, 2000);
+                }, 1500);
+            }, 1000);
+        });
+        
+        // 更新余额显示
+        function updateBalance() {
+            balanceElement.textContent = `¥${balance.toFixed(2)}`;
+        }
+        
+        // 添加交易记录
+        function addTransaction(type, amount, isPositive) {
+            const now = new Date();
+            const dateStr = `${now.getFullYear()}-${(now.getMonth()+1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+            
+            const transactionItem = document.createElement('div');
+            transactionItem.className = 'transaction-item';
+            transactionItem.innerHTML = `
+                <span class="transaction-type">${type}</span> 
+                <span class="transaction-amount ${isPositive ? 'positive' : 'negative'}">${isPositive ? '+' : '-'}¥${amount.toFixed(2)}</span>
+                <div>${dateStr}</div>
+            `;
+            
+            transactionList.insertBefore(transactionItem, transactionList.firstChild);
+        }
+        
+        // 显示操作反馈消息
+        function showMessage(message) {
+            // 在实际应用中，这里可以替换为更美观的提示组件
+            alert(message);
+        }
+        
+        // 初始化
+        updateBalance();
+    </script>
+</body>
+                  </html>
