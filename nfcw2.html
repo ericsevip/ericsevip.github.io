@@ -1,478 +1,642 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NFC同学交易系统</title>
-    <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-        }
-        
-        body {
-            background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
-            color: #333;
-            min-height: 100vh;
-            padding: 20px;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-        
-        .container {
-            width: 100%;
-            max-width: 500px;
-            background-color: white;
-            border-radius: 20px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-            overflow: hidden;
-        }
-        
-        header {
-            background: linear-gradient(90deg, #2575fc 0%, #6a11cb 100%);
-            color: white;
-            padding: 20px;
-            text-align: center;
-        }
-        
-        h1 {
-            font-size: 1.8rem;
-            margin-bottom: 10px;
-        }
-        
-        .subtitle {
-            font-size: 1rem;
-            opacity: 0.9;
-        }
-        
-        .nfc-card {
-            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-            margin: 20px;
-            padding: 25px;
-            border-radius: 15px;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-            text-align: center;
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .nfc-card:before {
-            content: "";
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 5px;
-            background: linear-gradient(90deg, #2575fc 0%, #6a11cb 100%);
-        }
-        
-        .balance {
-            font-size: 3rem;
-            font-weight: bold;
-            margin: 15px 0;
-            color: #2575fc;
-        }
-        
-        .user-info {
-            display: flex;
-            justify-content: space-between;
-            margin-top: 20px;
-            font-size: 0.9rem;
-            color: #555;
-        }
-        
-        .controls {
-            padding: 0 20px 20px;
-        }
-        
-        .btn {
-            display: block;
-            width: 100%;
-            padding: 15px;
-            margin: 10px 0;
-            border: none;
-            border-radius: 10px;
-            font-size: 1.1rem;
-            font-weight: bold;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-        
-        .btn-primary {
-            background: linear-gradient(90deg, #2575fc 0%, #6a11cb 100%);
-            color: white;
-        }
-        
-        .btn-secondary {
-            background: #f0f0f0;
-            color: #333;
-        }
-        
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
-        }
-        
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.5);
-            z-index: 100;
-            justify-content: center;
-            align-items: center;
-        }
-        
-        .modal-content {
-            background-color: white;
-            padding: 25px;
-            border-radius: 15px;
-            width: 90%;
-            max-width: 400px;
-            box-shadow: 0 5px 25px rgba(0, 0, 0, 0.2);
-        }
-        
-        .modal h2 {
-            margin-bottom: 15px;
-            color: #2575fc;
-        }
-        
-        .form-group {
-            margin-bottom: 15px;
-        }
-        
-        label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
-            color: #555;
-        }
-        
-        input, select {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            font-size: 1rem;
-        }
-        
-        .modal-buttons {
-            display: flex;
-            justify-content: space-between;
-            margin-top: 20px;
-        }
-        
-        .modal-btn {
-            padding: 10px 20px;
-            border: none;
-            border-radius: 8px;
-            font-weight: bold;
-            cursor: pointer;
-            flex: 1;
-            margin: 0 5px;
-        }
-        
-        .modal-btn.confirm {
-            background: #2575fc;
-            color: white;
-        }
-        
-        .modal-btn.cancel {
-            background: #f0f0f0;
-            color: #333;
-        }
-        
-        .history {
-            padding: 0 20px 20px;
-        }
-        
-        .history h2 {
-            margin-bottom: 15px;
-            color: #2575fc;
-            font-size: 1.3rem;
-        }
-        
-        .transaction-list {
-            max-height: 200px;
-            overflow-y: auto;
-        }
-        
-        .transaction-item {
-            padding: 10px 15px;
-            border-left: 4px solid #2575fc;
-            background-color: #f9f9f9;
-            margin-bottom: 10px;
-            border-radius: 0 8px 8px 0;
-        }
-        
-        .transaction-type {
-            font-weight: bold;
-            color: #2575fc;
-        }
-        
-        .transaction-amount {
-            float: right;
-            font-weight: bold;
-        }
-        
-        .positive {
-            color: #2ecc71;
-        }
-        
-        .negative {
-            color: #e74c3c;
-        }
-        
-        .nfc-icon {
-            font-size: 3rem;
-            margin-bottom: 10px;
-            color: #2575fc;
-        }
-        
-        @media (max-width: 480px) {
-            .container {
-                border-radius: 10px;
-            }
-            
-            h1 {
-                font-size: 1.5rem;
-            }
-            
-            .balance {
-                font-size: 2.5rem;
-            }
-        }
-    </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>NFC 标签钱包（离线单文件原型，含管理员密码）</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #0b0c0f;
+    --card: #12141a;
+    --muted: #7a8193;
+    --text: #e8ebf1;
+    --brand: #3b82f6;
+    --danger: #ef4444;
+    --ok: #22c55e;
+    --warn: #f59e0b;
+    --border: #202534;
+  }
+  html, body { margin:0; padding:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, PingFang SC, Noto Sans SC, Arial, sans-serif; background:#0b0c0f; color:var(--text); }
+  .wrap { max-width: 920px; margin: 0 auto; padding: 16px; }
+  h1 { font-size: 1.25rem; margin: 12px 0 8px; }
+  h2 { font-size: 1.05rem; margin: 18px 0 8px; }
+  .card { background: var(--card); border:1px solid var(--border); border-radius: 12px; padding: 12px; margin: 12px 0; }
+  .row { display: flex; gap: 10px; flex-wrap: wrap; }
+  .col { flex: 1 1 240px; min-width: 240px; }
+  label { display:block; font-size: 0.9rem; color: var(--muted); margin: 6px 0 4px; }
+  input, textarea, select { width:100%; box-sizing:border-box; padding:10px; border-radius:10px; border:1px solid var(--border); background:#0f1219; color:var(--text); }
+  textarea { min-height: 100px; resize: vertical; }
+  button { padding:10px 14px; border:1px solid var(--border); background:#111726; color:var(--text); border-radius:10px; cursor:pointer; }
+  button.primary { background: var(--brand); border-color: transparent; color: white; }
+  button.warn { background: var(--warn); border-color: transparent; color: black; }
+  button.danger { background: var(--danger); border-color: transparent; color: white; }
+  button.ghost { background: transparent; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .muted { color: var(--muted); }
+  .ok { color: var(--ok); }
+  .err { color: var(--danger); }
+  .warnText { color: var(--warn); }
+  .hr { height:1px; background:var(--border); margin: 10px 0; }
+  .pill { display:inline-block; padding: 2px 8px; border-radius: 999px; background:#101626; border:1px solid var(--border); font-size:.8rem; color:var(--muted); }
+  .grid-2 { display:grid; grid-template-columns: 1fr; gap: 12px; }
+  @media (min-width:720px) {
+    .grid-2 { grid-template-columns: 1fr 1fr; }
+  }
+  details { background:#0f1219; border:1px dashed var(--border); border-radius:10px; padding:8px 10px; }
+  summary { cursor:pointer; color: var(--muted); }
+  .footer { font-size:.85rem; color:var(--muted); margin-top:8px; }
+</style>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>NFC同学交易系统</h1>
-            <p class="subtitle">模拟NFC标签交易 - 仅供演示使用</p>
-        </header>
-        
-        <div class="nfc-card">
-            <div class="nfc-icon">📱</div>
-            <h2>我的NFC标签</h2>
-            <div class="balance" id="balance">¥50.00</div>
-            <p>用户ID: <span id="user-id">STU2023001</span></p>
-            <div class="user-info">
-                <span>持有人: 张三</span>
-                <span>班级: 高三(2)班</span>
-            </div>
-        </div>
-        
-        <div class="controls">
-            <button class="btn btn-primary" id="read-btn">读取NFC标签</button>
-            <button class="btn btn-secondary" id="add-value-btn">增值</button>
-            <button class="btn btn-secondary" id="transfer-btn">转账</button>
-        </div>
-        
-        <div class="history">
-            <h2>交易记录</h2>
-            <div class="transaction-list" id="transaction-list">
-                <div class="transaction-item">
-                    <span class="transaction-type">充值</span> 
-                    <span class="transaction-amount positive">+¥20.00</span>
-                    <div>2023-10-15 14:30</div>
-                </div>
-                <div class="transaction-item">
-                    <span class="transaction-type">转账给李四</span> 
-                    <span class="transaction-amount negative">-¥15.00</span>
-                    <div>2023-10-14 09:45</div>
-                </div>
-                <div class="transaction-item">
-                    <span class="transaction-type">充值</span> 
-                    <span class="transaction-amount positive">+¥30.00</span>
-                    <div>2023-10-10 16:20</div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- 增值模态框 -->
-    <div class="modal" id="add-value-modal">
-        <div class="modal-content">
-            <h2>增值操作</h2>
-            <div class="form-group">
-                <label for="amount">增值金额 (¥)</label>
-                <input type="number" id="amount" min="1" max="1000" value="10">
-            </div>
-            <div class="modal-buttons">
-                <button class="modal-btn cancel" id="cancel-add">取消</button>
-                <button class="modal-btn confirm" id="confirm-add">确认增值</button>
-            </div>
-        </div>
-    </div>
-    
-    <!-- 转账模态框 -->
-    <div class="modal" id="transfer-modal">
-        <div class="modal-content">
-            <h2>转账操作</h2>
-            <div class="form-group">
-                <label for="recipient">收款人</label>
-                <select id="recipient">
-                    <option value="STU2023002">李四 - 高三(2)班</option>
-                    <option value="STU2023003">王五 - 高三(1)班</option>
-                    <option value="STU2023004">赵六 - 高三(3)班</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label for="transfer-amount">转账金额 (¥)</label>
-                <input type="number" id="transfer-amount" min="1" max="50" value="5">
-            </div>
-            <div class="modal-buttons">
-                <button class="modal-btn cancel" id="cancel-transfer">取消</button>
-                <button class="modal-btn confirm" id="confirm-transfer">确认转账</button>
-            </div>
-        </div>
-    </div>
-    
-    <!-- NFC读取提示 -->
-    <div class="modal" id="nfc-modal">
-        <div class="modal-content">
-            <h2>读取NFC标签</h2>
-            <p>请将NFC标签靠近设备背面...</p>
-            <div style="text-align: center; margin: 20px 0; font-size: 3rem;">📱</div>
-            <p id="nfc-status">等待读取中...</p>
-            <div class="modal-buttons">
-                <button class="modal-btn cancel" id="cancel-nfc">取消</button>
-            </div>
-        </div>
-    </div>
+<div class="wrap">
+  <h1>NFC 标签钱包（离线单文件原型，含管理员密码）</h1>
+  <div class="muted">
+    - 仅供学习/演示，别用于真实资金。标签可被克隆，无法防双花。<br>
+    - 需 Android Chrome/Edge + Web NFC（HTTPS/localhost，更推荐 HTTPS）。<br>
+    - 读写时请将手机背部贴近 NFC 标签，并保持不动直到完成。<br>
+    - 管理员密码固定为：114514（写死在前端代码里，任何人查看源码都能看到，只作演示用途）。
+  </div>
 
-    <script>
-        // 获取DOM元素
-        const balanceElement = document.getElementById('balance');
-        const readBtn = document.getElementById('read-btn');
-        const addValueBtn = document.getElementById('add-value-btn');
-        const transferBtn = document.getElementById('transfer-btn');
-        const addValueModal = document.getElementById('add-value-modal');
-        const transferModal = document.getElementById('transfer-modal');
-        const nfcModal = document.getElementById('nfc-modal');
-        const cancelAdd = document.getElementById('cancel-add');
-        const confirmAdd = document.getElementById('confirm-add');
-        const cancelTransfer = document.getElementById('cancel-transfer');
-        const confirmTransfer = document.getElementById('confirm-transfer');
-        const cancelNfc = document.getElementById('cancel-nfc');
-        const transactionList = document.getElementById('transaction-list');
-        const nfcStatus = document.getElementById('nfc-status');
-        
-        // 初始余额
-        let balance = 50.00;
-        
-        // 打开增值模态框
-        addValueBtn.addEventListener('click', () => {
-            addValueModal.style.display = 'flex';
-        });
-        
-        // 打开转账模态框
-        transferBtn.addEventListener('click', () => {
-            transferModal.style.display = 'flex';
-        });
-        
-        // 关闭增值模态框
-        cancelAdd.addEventListener('click', () => {
-            addValueModal.style.display = 'none';
-        });
-        
-        // 关闭转账模态框
-        cancelTransfer.addEventListener('click', () => {
-            transferModal.style.display = 'none';
-        });
-        
-        // 关闭NFC读取模态框
-        cancelNfc.addEventListener('click', () => {
-            nfcModal.style.display = 'none';
-        });
-        
-        // 确认增值
-        confirmAdd.addEventListener('click', () => {
-            const amount = parseFloat(document.getElementById('amount').value);
-            if (amount > 0) {
-                balance += amount;
-                updateBalance();
-                addTransaction('充值', amount, true);
-                addValueModal.style.display = 'none';
-                showMessage(`成功充值 ¥${amount.toFixed(2)}`);
+  <div class="card">
+    <h2>我的密钥</h2>
+    <div class="row">
+      <div class="col">
+        <button id="btnGenerate" class="primary">生成 Ed25519 密钥</button>
+        <button id="btnExport" class="ghost">导出账户（含私钥）</button>
+        <input id="importInput" type="file" accept="application/json" style="display:none">
+        <button id="btnImport" class="ghost">导入账户（JSON）</button>
+      </div>
+      <div class="col">
+        <div>公钥指纹：<span id="pubFp" class="mono pill">-</span></div>
+        <div class="muted">私钥仅保存在本浏览器本设备（IndexedDB）。导出妥善保管。</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>读取/验证标签</h2>
+    <div class="row">
+      <div class="col">
+        <button id="btnRead" class="primary">读取标签</button>
+      </div>
+      <div class="col">
+        <div id="readStatus" class="muted">尚未读取</div>
+      </div>
+    </div>
+    <div class="hr"></div>
+    <label>标签内容（JSON）</label>
+    <textarea id="tagJson" class="mono" readonly></textarea>
+  </div>
+
+  <div class="card">
+    <h2>初始化/重置标签（需要管理员密码）</h2>
+    <div class="grid-2">
+      <div>
+        <label>初始余额（最小单位，如“分”）</label>
+        <input id="initBalance" type="number" min="0" step="1" value="1000">
+      </div>
+      <div>
+        <label>账户标识（留空自动生成）</label>
+        <input id="initAccount" placeholder="如空则自动生成">
+      </div>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button id="btnInit" class="warn">初始化/重置（会覆盖标签）</button>
+      <span class="muted">使用当前浏览器的公钥作为账户 ownerPubKey。</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>充值到标签（需要管理员密码）</h2>
+    <div class="grid-2">
+      <div>
+        <label>充值金额（正整数）</label>
+        <input id="topupAmount" type="number" min="1" step="1" value="100">
+      </div>
+      <div class="muted">需要你持有账户的签名权（使用本地私钥签名）。</div>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button id="btnTopup" class="primary">读取并充值</button>
+      <span id="topupStatus" class="muted"></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>标签到标签转账</h2>
+    <div class="grid-2">
+      <div>
+        <label>转账金额（正整数）</label>
+        <input id="transferAmount" type="number" min="1" step="1" value="100">
+      </div>
+      <div class="muted">流程：先贴 A，弹出确认，随后贴 B，依次写回 A 与 B。A 与 B 必须是不同账户。</div>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button id="btnTransfer" class="primary">开始转账流程</button>
+      <span id="transferStatus" class="muted"></span>
+    </div>
+  </div>
+
+  <details class="card">
+    <summary>格式说明与注意事项（点开查看）</summary>
+    <div class="muted">
+      - 标签数据结构（NDEF 文本记录，UTF-8 JSON）：<br>
+      {
+      "version":1, "account":"tag-uuid", "ownerPubKey":"base64",
+      "balance":123, "nonce":0,
+      "lastTx":{"from":"...", "to":"...", "amount":1, "ts":1690000000000},
+      "sig":"base64"
+      }<br>
+      - 签名覆盖除 sig 以外所有字段。nonce 每次加 1 防回放。<br>
+      - 任何能写入的人都可覆盖数据；签名仅用于校验“是否由持有私钥者更新”。<br>
+      - 并发写入会造成双花；若要缓解需引入线上撮合或 UTXO/多版本设计（本原型未实现）。<br>
+    </div>
+  </details>
+
+  <div class="footer">
+    MIT 许可。需要 Android Chrome、HTTPS、本地贴近稳定。管理员密码仅作演示用途：114514。
+  </div>
+</div>
+
+<script>
+/* ========= 配置：管理员密码（写死） ========= */
+const ADMIN_PASSWORD = "114514";
+
+/* ========= 小工具 ========= */
+const enc = new TextEncoder();
+const dec = new TextDecoder();
+const sleep = (ms)=>new Promise(r=>setTimeout(r, ms));
+const b64 = {
+  to: (buf)=> btoa(String.fromCharCode(...new Uint8Array(buf))),
+  from: (str)=> Uint8Array.from(atob(str), c=>c.charCodeAt(0)).buffer,
+};
+const hex = (buf)=>[...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,"0")).join("");
+
+function uid(prefix="tag") {
+  const a = crypto.getRandomValues(new Uint8Array(8));
+  return `${prefix}-${[...a].map(x=>x.toString(16).padStart(2,"0")).join("")}`;
+}
+
+/* ========= 简易持久化（IndexedDB） ========= */
+const DB_NAME = "nfc-wallet-db";
+const DB_STORE = "keys";
+function idbOpen() {
+  return new Promise((resolve, reject)=>{
+    const req = indexedDB.open(DB_NAME, 1);
+    req.onupgradeneeded = ()=> {
+      const db = req.result;
+      if (!db.objectStoreNames.contains(DB_STORE)) {
+        db.createObjectStore(DB_STORE);
+      }
+    };
+    req.onsuccess = ()=> resolve(req.result);
+    req.onerror = ()=> reject(req.error);
+  });
+}
+async function idbGet(key) {
+  const db = await idbOpen();
+  return new Promise((resolve, reject)=>{
+    const tx = db.transaction(DB_STORE, "readonly");
+    const store = tx.objectStore(DB_STORE);
+    const req = store.get(key);
+    req.onsuccess = ()=> resolve(req.result || null);
+    req.onerror = ()=> reject(req.error);
+  });
+}
+async function idbSet(key, value) {
+  const db = await idbOpen();
+  return new Promise((resolve, reject)=>{
+    const tx = db.transaction(DB_STORE, "readwrite");
+    const store = tx.objectStore(DB_STORE);
+    const req = store.put(value, key);
+    req.onsuccess = ()=> resolve();
+    req.onerror = ()=> reject(req.error);
+  });
+}
+
+/* ========= 密钥管理（Ed25519 via WebCrypto） ========= */
+// Chromium 117+ 支持 Ed25519，算法标识 "NODE-ED25519"
+const KEY_ID = "ed25519-key";
+let keyPair = null;
+
+async function ensureKey() {
+  if (keyPair) return keyPair;
+  const rawPriv = await idbGet(KEY_ID);
+  if (rawPriv) {
+    const priv = await crypto.subtle.importKey(
+      "pkcs8", rawPriv, { name:"NODE-ED25519", namedCurve:"NODE-ED25519" }, false, ["sign"]
+    ).catch(()=>null);
+    const pubRaw = await idbGet(KEY_ID + ":pub");
+    const pub = pubRaw ? await crypto.subtle.importKey(
+      "spki", pubRaw, { name:"NODE-ED25519", namedCurve:"NODE-ED25519" }, false, ["verify"]
+    ).catch(()=>null) : null;
+    if (priv && pub) {
+      keyPair = { privateKey: priv, publicKey: pub };
+      return keyPair;
+    }
+  }
+  return null;
+}
+
+async function generateKey() {
+  const kp = await crypto.subtle.generateKey(
+    { name:"NODE-ED25519", namedCurve:"NODE-ED25519" }, true, ["sign","verify"]
+  );
+  const pkcs8 = await crypto.subtle.exportKey("pkcs8", kp.privateKey);
+  const spki = await crypto.subtle.exportKey("spki", kp.publicKey);
+  await idbSet(KEY_ID, pkcs8);
+  await idbSet(KEY_ID + ":pub", spki);
+  keyPair = kp;
+  return kp;
+}
+
+async function getPubKeyRaw() {
+  const kp = await ensureKey();
+  if (!kp) return null;
+  return await crypto.subtle.exportKey("spki", kp.publicKey);
+}
+
+async function signBytes(bytes) {
+  const kp = await ensureKey();
+  if (!kp) throw new Error("尚未生成/导入密钥");
+  const sig = await crypto.subtle.sign({ name:"NODE-ED25519" }, kp.privateKey, bytes);
+  return sig;
+}
+
+async function verifyBytes(pubSpki, bytes, sig) {
+  const pub = await crypto.subtle.importKey(
+    "spki", pubSpki, { name:"NODE-ED25519", namedCurve:"NODE-ED25519" }, false, ["verify"]
+  );
+  return await crypto.subtle.verify({ name:"NODE-ED25519" }, pub, sig, bytes);
+}
+
+async function pubFingerprint() {
+  const spki = await getPubKeyRaw();
+  if (!spki) return "-";
+  const digest = await crypto.subtle.digest("SHA-256", spki);
+  return hex(digest).slice(0, 16);
+}
+
+/* ========= 标签数据结构与签名 ========= */
+function sanitizeTag(obj) {
+  return {
+    version: 1,
+    account: String(obj.account || ""),
+    ownerPubKey: String(obj.ownerPubKey || ""),
+    balance: Number.isFinite(obj.balance) ? Math.max(0, Math.floor(obj.balance)) : 0,
+    nonce: Number.isFinite(obj.nonce) ? Math.max(0, Math.floor(obj.nonce)) : 0,
+    lastTx: obj.lastTx ? {
+      from: String(obj.lastTx.from || ""),
+      to: String(obj.lastTx.to || ""),
+      amount: Number.isFinite(obj.lastTx.amount) ? Math.max(0, Math.floor(obj.lastTx.amount)) : 0,
+      ts: Number.isFinite(obj.lastTx.ts) ? Math.floor(obj.lastTx.ts) : Date.now()
+    } : { from:"", to:"", amount:0, ts: Date.now() },
+    sig: String(obj.sig || "")
+  };
+}
+
+function detachSig(obj) {
+  const { sig, ...rest } = obj;
+  return rest;
+}
+
+function encodePayload(objNoSig) {
+  const payload = {
+    version: objNoSig.version,
+    account: objNoSig.account,
+    ownerPubKey: objNoSig.ownerPubKey,
+    balance: objNoSig.balance,
+    nonce: objNoSig.nonce,
+    lastTx: {
+      from: objNoSig.lastTx.from,
+      to: objNoSig.lastTx.to,
+      amount: objNoSig.lastTx.amount,
+      ts: objNoSig.lastTx.ts
+    }
+  };
+  const json = JSON.stringify(payload);
+  return enc.encode(json);
+}
+
+async function signTagObject(obj) {
+  const clean = sanitizeTag(obj);
+  const payloadBytes = encodePayload(detachSig(clean));
+  const sig = await signBytes(payloadBytes);
+  clean.sig = b64.to(sig);
+  return clean;
+}
+
+async function verifyTagObject(obj) {
+  const clean = sanitizeTag(obj);
+  if (!clean.ownerPubKey || !clean.sig) return { ok:false, reason:"缺少公钥或签名" };
+  const payloadBytes = encodePayload(detachSig(clean));
+  const ok = await verifyBytes(b64.from(clean.ownerPubKey), payloadBytes, b64.from(clean.sig)).catch(()=>false);
+  return { ok, reason: ok ? "" : "签名校验失败" };
+}
+
+/* ========= Web NFC 读写 ========= */
+function ensureNFC() {
+  if (!("NDEFReader" in window)) throw new Error("此浏览器不支持 Web NFC。请使用 Android Chrome 并开启 NFC。");
+}
+
+async function nfcReadOnce() {
+  ensureNFC();
+  const reader = new NDEFReader();
+  await reader.scan(); // 需要用户手势触发
+  return new Promise((resolve, reject)=>{
+    const timer = setTimeout(()=>reject(new Error("读取超时，请重试并贴近标签")), 30000);
+    reader.onreadingerror = (e)=> {
+      clearTimeout(timer);
+      reject(new Error("读取失败：" + (e?.message || "unknown")));
+    };
+    reader.onreading = (event)=> {
+      clearTimeout(timer);
+      try {
+        const { message } = event;
+        for (const record of message.records) {
+          if (record.recordType === "text" || record.mediaType === "application/json") {
+            let text = "";
+            if (record.data) {
+              text = dec.decode(record.data);
+            } else if (record.data === "" && "data" in record) {
+              text = "";
+            } else if (record.data === undefined && record.recordType === "text") {
+              // 兼容部分实现
+              text = "";
             }
-        });
-        
-        // 确认转账
-        confirmTransfer.addEventListener('click', () => {
-            const amount = parseFloat(document.getElementById('transfer-amount').value);
-            const recipientSelect = document.getElementById('recipient');
-            const recipientText = recipientSelect.options[recipientSelect.selectedIndex].text;
-            
-            if (amount > 0) {
-                if (amount > balance) {
-                    alert('余额不足！');
-                    return;
-                }
-                
-                balance -= amount;
-                updateBalance();
-                addTransaction(`转账给${recipientText.split(' - ')[0]}`, amount, false);
-                transferModal.style.display = 'none';
-                showMessage(`成功向${recipientText.split(' - ')[0]}转账 ¥${amount.toFixed(2)}`);
-            }
-        });
-        
-        // 模拟读取NFC标签
-        readBtn.addEventListener('click', () => {
-            nfcModal.style.display = 'flex';
-            nfcStatus.textContent = '等待读取中...';
-            
-            // 模拟NFC读取过程
-            setTimeout(() => {
-                nfcStatus.textContent = '检测到NFC标签...';
-                
-                setTimeout(() => {
-                    nfcStatus.innerHTML = '读取成功！<br>用户: 李四<br>余额: ¥35.00';
-                    
-                    setTimeout(() => {
-                        nfcModal.style.display = 'none';
-                        showMessage('NFC标签读取成功！');
-                    }, 2000);
-                }, 1500);
-            }, 1000);
-        });
-        
-        // 更新余额显示
-        function updateBalance() {
-            balanceElement.textContent = `¥${balance.toFixed(2)}`;
+            resolve(text);
+            return;
+          }
         }
-        
-        // 添加交易记录
-        function addTransaction(type, amount, isPositive) {
-            const now = new Date();
-            const dateStr = `${now.getFullYear()}-${(now.getMonth()+1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-            
-            const transactionItem = document.createElement('div');
-            transactionItem.className = 'transaction-item';
-            transactionItem.innerHTML = `
-                <span class="transaction-type">${type}</span> 
-                <span class="transaction-amount ${isPositive ? 'positive' : 'negative'}">${isPositive ? '+' : '-'}¥${amount.toFixed(2)}</span>
-                <div>${dateStr}</div>
-            `;
-            
-            transactionList.insertBefore(transactionItem, transactionList.firstChild);
-        }
-        
-        // 显示操作反馈消息
-        function showMessage(message) {
-            // 在实际应用中，这里可以替换为更美观的提示组件
-            alert(message);
-        }
-        
-        // 初始化
-        updateBalance();
-    </script>
+        resolve("");
+      } catch (err) {
+        reject(err);
+      }
+    };
+  });
+}
+
+async function nfcWriteText(text) {
+  ensureNFC();
+  const writer = new NDEFReader();
+  await writer.write({ records: [{ recordType: "text", data: text }] });
+}
+
+/* ========= UI 逻辑 ========= */
+const el = (id)=>document.getElementById(id);
+const status = {
+  read: el("readStatus"),
+  topup: el("topupStatus"),
+  transfer: el("transferStatus"),
+  pubFp: el("pubFp"),
+  tagJson: el("tagJson"),
+};
+
+async function refreshFp() {
+  status.pubFp.textContent = await pubFingerprint();
+}
+
+function showJSON(target, obj) {
+  target.value = JSON.stringify(obj, null, 2);
+}
+
+function parseTagJSON(text) {
+  try {
+    const obj = JSON.parse(text);
+    return sanitizeTag(obj);
+  } catch (e) {
+    return null;
+  }
+}
+
+/* ========= 管理员密码校验 ========= */
+async function requireAdminPassword(purposeText) {
+  const input = prompt(`${purposeText}\n请输入管理员密码以继续：`);
+  if (input === null) return false; // 用户取消
+  if (input !== ADMIN_PASSWORD) {
+    alert("管理员密码错误。");
+    return false;
+  }
+  return true;
+}
+
+/* ========= 事件绑定 ========= */
+window.addEventListener("load", async ()=>{
+  await ensureKey().catch(()=>{});
+  await refreshFp();
+
+  el("btnGenerate").addEventListener("click", async ()=>{
+    try {
+      await generateKey();
+      await refreshFp();
+      alert("密钥已生成并保存到本设备。");
+    } catch (e) {
+      alert("生成失败：" + e.message + "\n你的浏览器需支持 Ed25519 WebCrypto（Chromium 117+）");
+    }
+  });
+
+  el("btnExport").addEventListener("click", async ()=>{
+    try {
+      const priv = await idbGet(KEY_ID);
+      const pub = await idbGet(KEY_ID + ":pub");
+      if (!priv || !pub) return alert("尚未生成/导入密钥");
+      const data = {
+        type: "nfc-wallet-ed25519",
+        createdAt: Date.now(),
+        privateKeyPkcs8_b64: b64.to(priv),
+        publicKeySpki_b64: b64.to(pub),
+      };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "nfc-wallet-account.json";
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch (e) {
+      alert("导出失败：" + e.message);
+    }
+  });
+
+  el("btnImport").addEventListener("click", async ()=>{
+    el("importInput").click();
+  });
+  el("importInput").addEventListener("change", async (e)=>{
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      if (data.type !== "nfc-wallet-ed25519") throw new Error("文件类型不匹配");
+      const priv = b64.from(data.privateKeyPkcs8_b64);
+      const pub = b64.from(data.publicKeySpki_b64);
+      const privKey = await crypto.subtle.importKey("pkcs8", priv, { name:"NODE-ED25519", namedCurve:"NODE-ED25519" }, false, ["sign"]);
+      const pubKey = await crypto.subtle.importKey("spki", pub, { name:"NODE-ED25519", namedCurve:"NODE-ED25519" }, false, ["verify"]);
+      await idbSet(KEY_ID, await crypto.subtle.exportKey("pkcs8", privKey));
+      await idbSet(KEY_ID + ":pub", await crypto.subtle.exportKey("spki", pubKey));
+      keyPair = { privateKey: privKey, publicKey: pubKey };
+      await refreshFp();
+      alert("导入成功");
+    } catch (err) {
+      alert("导入失败：" + err.message);
+    } finally {
+      e.target.value = "";
+    }
+  });
+
+  el("btnRead").addEventListener("click", async ()=>{
+    status.read.textContent = "请将手机贴近标签读取...";
+    status.read.className = "muted";
+    try {
+      const text = await nfcReadOnce();
+      if (!text) {
+        status.read.textContent = "读取完成：未找到文本记录（可能是空标签或非本系统标签）";
+        status.tagJson.value = "";
+        return;
+      }
+      const obj = parseTagJSON(text);
+      if (!obj) {
+        status.read.textContent = "读取完成：JSON 解析失败（不是本系统格式）";
+        status.read.className = "err";
+        status.tagJson.value = text;
+        return;
+      }
+      const vr = await verifyTagObject(obj);
+      status.read.textContent = vr.ok ? "读取完成：签名有效" : `读取完成：签名无效 ${vr.reason ? "(" + vr.reason + ")" : ""}`;
+      status.read.className = vr.ok ? "ok" : "err";
+      showJSON(status.tagJson, obj);
+    } catch (e) {
+      status.read.textContent = "读取失败：" + e.message;
+      status.read.className = "err";
+    }
+  });
+
+  el("btnInit").addEventListener("click", async ()=>{
+    try {
+      const passOK = await requireAdminPassword("将要初始化/重置标签，这会覆盖原有内容。");
+      if (!passOK) return;
+
+      const bal = Math.max(0, Math.floor(Number(el("initBalance").value || 0)));
+      const acc = (el("initAccount").value || "").trim() || uid("acct");
+      const pub = await getPubKeyRaw();
+      if (!pub) return alert("请先生成或导入密钥");
+      const tag = await signTagObject({
+        version:1,
+        account: acc,
+        ownerPubKey: b64.to(pub),
+        balance: bal,
+        nonce: 0,
+        lastTx: { from:"", to:acc, amount:bal, ts: Date.now() }
+      });
+      const text = JSON.stringify(tag);
+      if (text.length > 800) {
+        return alert("数据长度超出大部分 NDEF 标签容量，请减少字段或数值大小");
+      }
+      if (!confirm("将覆盖标签上的文本记录，确认继续？")) return;
+      await nfcWriteText(text);
+      alert("写入完成。");
+    } catch (e) {
+      alert("初始化失败：" + e.message);
+    }
+  });
+
+  el("btnTopup").addEventListener("click", async ()=>{
+    status.topup.textContent = "请将手机贴近要充值的标签...";
+    status.topup.className = "muted";
+    try {
+      const passOK = await requireAdminPassword("执行充值操作需要管理员密码。");
+      if (!passOK) { status.topup.textContent = "已取消"; return; }
+
+      const text = await nfcReadOnce();
+      const obj = parseTagJSON(text);
+      if (!obj) throw new Error("读取到的标签不是有效 JSON");
+      const vr = await verifyTagObject(obj);
+      if (!vr.ok) throw new Error("原始标签签名无效，拒绝充值");
+
+      const amount = Math.max(1, Math.floor(Number(el("topupAmount").value || 0)));
+      obj.balance = Math.max(0, obj.balance + amount);
+      obj.nonce += 1;
+      obj.lastTx = { from:"external", to: obj.account, amount, ts: Date.now() };
+      const newObj = await signTagObject(obj);
+
+      const textOut = JSON.stringify(newObj);
+      if (textOut.length > 800) throw new Error("数据过大，写入可能失败");
+      if (!confirm(`将对账户 ${obj.account} 充值 ${amount}，确认写入？`)) return;
+
+      await nfcWriteText(textOut);
+      status.topup.textContent = "充值完成";
+      status.topup.className = "ok";
+      showJSON(status.tagJson, newObj);
+    } catch (e) {
+      status.topup.textContent = "充值失败：" + e.message;
+      status.topup.className = "err";
+    }
+  });
+
+  el("btnTransfer").addEventListener("click", async ()=>{
+    status.transfer.textContent = "步骤1/4：请贴近来源标签 A 读取...";
+    status.transfer.className = "muted";
+
+    try {
+      const amount = Math.max(1, Math.floor(Number(el("transferAmount").value || 0)));
+
+      // 读 A
+      const textA = await nfcReadOnce();
+      const A = parseTagJSON(textA);
+      if (!A) throw new Error("标签 A 不是有效 JSON");
+      const vA = await verifyTagObject(A);
+      if (!vA.ok) throw new Error("标签 A 签名无效");
+      if (A.balance < amount) throw new Error("标签 A 余额不足");
+
+      // 确认
+      if (!confirm(`确认从账户 A (${A.account}) 转出 ${amount}？\n下一步将读取账户 B。`)) {
+        status.transfer.textContent = "已取消";
+        return;
+      }
+
+      // 读 B
+      status.transfer.textContent = "步骤2/4：请贴近目标标签 B 读取...";
+      const textB = await nfcReadOnce();
+      const B = parseTagJSON(textB);
+      if (!B) throw new Error("标签 B 不是有效 JSON");
+      const vB = await verifyTagObject(B);
+      if (!vB.ok) throw new Error("标签 B 签名无效");
+
+      if (A.account === B.account) throw new Error("账户 A 与 B 相同，禁止转账");
+
+      // 更新内存状态
+      const A2 = sanitizeTag(A);
+      const B2 = sanitizeTag(B);
+      A2.balance -= amount; A2.nonce += 1;
+      B2.balance += amount; B2.nonce += 1;
+      const now = Date.now();
+      A2.lastTx = { from:A.account, to:B.account, amount, ts: now };
+      B2.lastTx = { from:A.account, to:B.account, amount, ts: now };
+
+      const A3 = await signTagObject(A2);
+      const B3 = await signTagObject(B2);
+
+      // 写回 A
+      status.transfer.textContent = "步骤3/4：请贴近标签 A 写回更新...";
+      if (!confirm(`将从 ${A.account} 向 ${B.account} 转账 ${amount}。\n先写回 A，再写回 B，确认？`)) {
+        status.transfer.textContent = "已取消";
+        return;
+      }
+      await nfcWriteText(JSON.stringify(A3));
+
+      // 写回 B
+      status.transfer.textContent = "步骤4/4：请贴近标签 B 写回更新...";
+      await nfcWriteText(JSON.stringify(B3));
+
+      status.transfer.textContent = "转账完成";
+      status.transfer.className = "ok";
+      showJSON(status.tagJson, { A: A3, B: B3 });
+    } catch (e) {
+      status.transfer.textContent = "转账失败：" + e.message + "（若已部分写入，请手动修正）";
+      status.transfer.className = "err";
+    }
+  });
+});
+</script>
 </body>
-                  </html>
+</html>
