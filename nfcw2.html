@@ -3,74 +3,50 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>NFC 标签钱包（离线单文件原型，含管理员密码）</title>
+<title>NFC 标签钱包（P-256 兼容版）</title>
 <style>
-  :root {
-    color-scheme: light dark;
-    --bg: #0b0c0f;
-    --card: #12141a;
-    --muted: #7a8193;
-    --text: #e8ebf1;
-    --brand: #3b82f6;
-    --danger: #ef4444;
-    --ok: #22c55e;
-    --warn: #f59e0b;
-    --border: #202534;
-  }
-  html, body { margin:0; padding:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, PingFang SC, Noto Sans SC, Arial, sans-serif; background:#0b0c0f; color:var(--text); }
-  .wrap { max-width: 920px; margin: 0 auto; padding: 16px; }
-  h1 { font-size: 1.25rem; margin: 12px 0 8px; }
-  h2 { font-size: 1.05rem; margin: 18px 0 8px; }
-  .card { background: var(--card); border:1px solid var(--border); border-radius: 12px; padding: 12px; margin: 12px 0; }
-  .row { display: flex; gap: 10px; flex-wrap: wrap; }
-  .col { flex: 1 1 240px; min-width: 240px; }
-  label { display:block; font-size: 0.9rem; color: var(--muted); margin: 6px 0 4px; }
-  input, textarea, select { width:100%; box-sizing:border-box; padding:10px; border-radius:10px; border:1px solid var(--border); background:#0f1219; color:var(--text); }
-  textarea { min-height: 100px; resize: vertical; }
-  button { padding:10px 14px; border:1px solid var(--border); background:#111726; color:var(--text); border-radius:10px; cursor:pointer; }
-  button.primary { background: var(--brand); border-color: transparent; color: white; }
-  button.warn { background: var(--warn); border-color: transparent; color: black; }
-  button.danger { background: var(--danger); border-color: transparent; color: white; }
-  button.ghost { background: transparent; }
-  button:disabled { opacity: .5; cursor: not-allowed; }
-  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
-  .muted { color: var(--muted); }
-  .ok { color: var(--ok); }
-  .err { color: var(--danger); }
-  .warnText { color: var(--warn); }
-  .hr { height:1px; background:var(--border); margin: 10px 0; }
-  .pill { display:inline-block; padding: 2px 8px; border-radius: 999px; background:#101626; border:1px solid var(--border); font-size:.8rem; color:var(--muted); }
-  .grid-2 { display:grid; grid-template-columns: 1fr; gap: 12px; }
-  @media (min-width:720px) {
-    .grid-2 { grid-template-columns: 1fr 1fr; }
-  }
-  details { background:#0f1219; border:1px dashed var(--border); border-radius:10px; padding:8px 10px; }
-  summary { cursor:pointer; color: var(--muted); }
-  .footer { font-size:.85rem; color:var(--muted); margin-top:8px; }
+  :root { color-scheme: light dark; --bg:#0b0c0f; --card:#12141a; --muted:#7a8193; --text:#e8ebf1; --brand:#3b82f6; --danger:#ef4444; --ok:#22c55e; --warn:#f59e0b; --border:#202534; }
+  html,body{margin:0;padding:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,PingFang SC,Noto Sans SC,Arial,sans-serif;background:#0b0c0f;color:var(--text)}
+  .wrap{max-width:920px;margin:0 auto;padding:16px}
+  h1{font-size:1.25rem;margin:12px 0 8px} h2{font-size:1.05rem;margin:18px 0 8px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px;margin:12px 0}
+  .row{display:flex;gap:10px;flex-wrap:wrap}.col{flex:1 1 240px;min-width:240px}
+  label{display:block;font-size:.9rem;color:var(--muted);margin:6px 0 4px}
+  input,textarea,select{width:100%;box-sizing:border-box;padding:10px;border-radius:10px;border:1px solid var(--border);background:#0f1219;color:var(--text)}
+  textarea{min-height:100px;resize:vertical}
+  button{padding:10px 14px;border:1px solid var(--border);background:#111726;color:var(--text);border-radius:10px;cursor:pointer}
+  button.primary{background:var(--brand);border-color:transparent;color:#fff}
+  button.warn{background:var(--warn);border-color:transparent;color:#000}
+  button.ghost{background:transparent} button:disabled{opacity:.5;cursor:not-allowed}
+  .mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  .muted{color:var(--muted)} .ok{color:var(--ok)} .err{color:var(--danger)}
+  .pill{display:inline-block;padding:2px 8px;border-radius:999px;background:#101626;border:1px solid var(--border);font-size:.8rem;color:var(--muted)}
+  .hr{height:1px;background:var(--border);margin:10px 0}
+  .grid-2{display:grid;grid-template-columns:1fr;gap:12px}
+  @media (min-width:720px){.grid-2{grid-template-columns:1fr 1fr}}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>NFC 标签钱包（离线单文件原型，含管理员密码）</h1>
+  <h1>NFC 标签钱包（P-256 兼容版，含管理员密码）</h1>
   <div class="muted">
-    - 仅供学习/演示，别用于真实资金。标签可被克隆，无法防双花。<br>
-    - 需 Android Chrome/Edge + Web NFC（HTTPS/localhost，更推荐 HTTPS）。<br>
-    - 读写时请将手机背部贴近 NFC 标签，并保持不动直到完成。<br>
-    - 管理员密码固定为：114514（写死在前端代码里，任何人查看源码都能看到，只作演示用途）。
+    - 为兼容性使用 ECDSA P-256（WebCrypto 广泛支持）。<br>
+    - 管理员密码：114514（用于初始化与充值）。<br>
+    - Android Chrome + HTTPS/localhost 使用 Web NFC。
   </div>
 
   <div class="card">
     <h2>我的密钥</h2>
     <div class="row">
       <div class="col">
-        <button id="btnGenerate" class="primary">生成 Ed25519 密钥</button>
+        <button id="btnGenerate" class="primary">生成 P-256 密钥</button>
         <button id="btnExport" class="ghost">导出账户（含私钥）</button>
         <input id="importInput" type="file" accept="application/json" style="display:none">
         <button id="btnImport" class="ghost">导入账户（JSON）</button>
       </div>
       <div class="col">
         <div>公钥指纹：<span id="pubFp" class="mono pill">-</span></div>
-        <div class="muted">私钥仅保存在本浏览器本设备（IndexedDB）。导出妥善保管。</div>
+        <div class="muted">私钥仅保存在本设备（IndexedDB）。</div>
       </div>
     </div>
   </div>
@@ -78,12 +54,8 @@
   <div class="card">
     <h2>读取/验证标签</h2>
     <div class="row">
-      <div class="col">
-        <button id="btnRead" class="primary">读取标签</button>
-      </div>
-      <div class="col">
-        <div id="readStatus" class="muted">尚未读取</div>
-      </div>
+      <div class="col"><button id="btnRead" class="primary">读取标签</button></div>
+      <div class="col"><div id="readStatus" class="muted">尚未读取</div></div>
     </div>
     <div class="hr"></div>
     <label>标签内容（JSON）</label>
@@ -93,29 +65,20 @@
   <div class="card">
     <h2>初始化/重置标签（需要管理员密码）</h2>
     <div class="grid-2">
-      <div>
-        <label>初始余额（最小单位，如“分”）</label>
-        <input id="initBalance" type="number" min="0" step="1" value="1000">
-      </div>
-      <div>
-        <label>账户标识（留空自动生成）</label>
-        <input id="initAccount" placeholder="如空则自动生成">
-      </div>
+      <div><label>初始余额</label><input id="initBalance" type="number" min="0" step="1" value="1000"></div>
+      <div><label>账户标识（留空自动生成）</label><input id="initAccount" placeholder="如空自动生成"></div>
     </div>
     <div class="row" style="margin-top:8px">
-      <button id="btnInit" class="warn">初始化/重置（会覆盖标签）</button>
-      <span class="muted">使用当前浏览器的公钥作为账户 ownerPubKey。</span>
+      <button id="btnInit" class="warn">初始化/重置（覆盖标签）</button>
+      <span class="muted">使用当前浏览器公钥作为 ownerPubKey。</span>
     </div>
   </div>
 
   <div class="card">
     <h2>充值到标签（需要管理员密码）</h2>
     <div class="grid-2">
-      <div>
-        <label>充值金额（正整数）</label>
-        <input id="topupAmount" type="number" min="1" step="1" value="100">
-      </div>
-      <div class="muted">需要你持有账户的签名权（使用本地私钥签名）。</div>
+      <div><label>充值金额</label><input id="topupAmount" type="number" min="1" step="1" value="100"></div>
+      <div class="muted">需使用本地私钥签名。</div>
     </div>
     <div class="row" style="margin-top:8px">
       <button id="btnTopup" class="primary">读取并充值</button>
@@ -126,515 +89,253 @@
   <div class="card">
     <h2>标签到标签转账</h2>
     <div class="grid-2">
-      <div>
-        <label>转账金额（正整数）</label>
-        <input id="transferAmount" type="number" min="1" step="1" value="100">
-      </div>
-      <div class="muted">流程：先贴 A，弹出确认，随后贴 B，依次写回 A 与 B。A 与 B 必须是不同账户。</div>
+      <div><label>转账金额</label><input id="transferAmount" type="number" min="1" step="1" value="100"></div>
+      <div class="muted">先贴 A → 确认 → 再贴 B；A 与 B 必须不同账户。</div>
     </div>
     <div class="row" style="margin-top:8px">
       <button id="btnTransfer" class="primary">开始转账流程</button>
       <span id="transferStatus" class="muted"></span>
     </div>
   </div>
-
-  <details class="card">
-    <summary>格式说明与注意事项（点开查看）</summary>
-    <div class="muted">
-      - 标签数据结构（NDEF 文本记录，UTF-8 JSON）：<br>
-      {
-      "version":1, "account":"tag-uuid", "ownerPubKey":"base64",
-      "balance":123, "nonce":0,
-      "lastTx":{"from":"...", "to":"...", "amount":1, "ts":1690000000000},
-      "sig":"base64"
-      }<br>
-      - 签名覆盖除 sig 以外所有字段。nonce 每次加 1 防回放。<br>
-      - 任何能写入的人都可覆盖数据；签名仅用于校验“是否由持有私钥者更新”。<br>
-      - 并发写入会造成双花；若要缓解需引入线上撮合或 UTXO/多版本设计（本原型未实现）。<br>
-    </div>
-  </details>
-
-  <div class="footer">
-    MIT 许可。需要 Android Chrome、HTTPS、本地贴近稳定。管理员密码仅作演示用途：114514。
-  </div>
 </div>
 
 <script>
-/* ========= 配置：管理员密码（写死） ========= */
 const ADMIN_PASSWORD = "114514";
 
-/* ========= 小工具 ========= */
-const enc = new TextEncoder();
-const dec = new TextDecoder();
-const sleep = (ms)=>new Promise(r=>setTimeout(r, ms));
-const b64 = {
-  to: (buf)=> btoa(String.fromCharCode(...new Uint8Array(buf))),
-  from: (str)=> Uint8Array.from(atob(str), c=>c.charCodeAt(0)).buffer,
-};
+/* 工具 */
+const enc = new TextEncoder(), dec = new TextDecoder();
+const b64 = { to: (buf)=> btoa(String.fromCharCode(...new Uint8Array(buf))), from: (str)=> Uint8Array.from(atob(str), c=>c.charCodeAt(0)).buffer };
 const hex = (buf)=>[...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,"0")).join("");
+const uid = (p="acct") => `${p}-${[...crypto.getRandomValues(new Uint8Array(8))].map(x=>x.toString(16).padStart(2,"0")).join("")}`;
 
-function uid(prefix="tag") {
-  const a = crypto.getRandomValues(new Uint8Array(8));
-  return `${prefix}-${[...a].map(x=>x.toString(16).padStart(2,"0")).join("")}`;
-}
+/* IndexedDB */
+const DB="nfc-wallet-db", STORE="keys", KEY_ID="p256-key";
+function idbOpen(){return new Promise((res,rej)=>{const r=indexedDB.open(DB,1);r.onupgradeneeded=()=>{const db=r.result; if(!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE)}; r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error);});}
+async function idbGet(k){const db=await idbOpen();return new Promise((res,rej)=>{const tx=db.transaction(STORE,"readonly");const s=tx.objectStore(STORE);const r=s.get(k);r.onsuccess=()=>res(r.result||null);r.onerror=()=>rej(r.error);});}
+async function idbSet(k,v){const db=await idbOpen();return new Promise((res,rej)=>{const tx=db.transaction(STORE,"readwrite");const s=tx.objectStore(STORE);const r=s.put(v,k);r.onsuccess=()=>res();r.onerror=()=>rej(r.error);});}
 
-/* ========= 简易持久化（IndexedDB） ========= */
-const DB_NAME = "nfc-wallet-db";
-const DB_STORE = "keys";
-function idbOpen() {
-  return new Promise((resolve, reject)=>{
-    const req = indexedDB.open(DB_NAME, 1);
-    req.onupgradeneeded = ()=> {
-      const db = req.result;
-      if (!db.objectStoreNames.contains(DB_STORE)) {
-        db.createObjectStore(DB_STORE);
-      }
-    };
-    req.onsuccess = ()=> resolve(req.result);
-    req.onerror = ()=> reject(req.error);
-  });
-}
-async function idbGet(key) {
-  const db = await idbOpen();
-  return new Promise((resolve, reject)=>{
-    const tx = db.transaction(DB_STORE, "readonly");
-    const store = tx.objectStore(DB_STORE);
-    const req = store.get(key);
-    req.onsuccess = ()=> resolve(req.result || null);
-    req.onerror = ()=> reject(req.error);
-  });
-}
-async function idbSet(key, value) {
-  const db = await idbOpen();
-  return new Promise((resolve, reject)=>{
-    const tx = db.transaction(DB_STORE, "readwrite");
-    const store = tx.objectStore(DB_STORE);
-    const req = store.put(value, key);
-    req.onsuccess = ()=> resolve();
-    req.onerror = ()=> reject(req.error);
-  });
-}
-
-/* ========= 密钥管理（Ed25519 via WebCrypto） ========= */
-// Chromium 117+ 支持 Ed25519，算法标识 "NODE-ED25519"
-const KEY_ID = "ed25519-key";
-let keyPair = null;
-
-async function ensureKey() {
-  if (keyPair) return keyPair;
-  const rawPriv = await idbGet(KEY_ID);
-  if (rawPriv) {
-    const priv = await crypto.subtle.importKey(
-      "pkcs8", rawPriv, { name:"NODE-ED25519", namedCurve:"NODE-ED25519" }, false, ["sign"]
-    ).catch(()=>null);
-    const pubRaw = await idbGet(KEY_ID + ":pub");
-    const pub = pubRaw ? await crypto.subtle.importKey(
-      "spki", pubRaw, { name:"NODE-ED25519", namedCurve:"NODE-ED25519" }, false, ["verify"]
-    ).catch(()=>null) : null;
-    if (priv && pub) {
-      keyPair = { privateKey: priv, publicKey: pub };
-      return keyPair;
-    }
-  }
+/* P-256 密钥与签名 */
+let keyPair=null;
+async function ensureKey(){ if(keyPair) return keyPair; const jpk=await idbGet(KEY_ID); if(jpk){ const kp=await crypto.subtle.importKey("jwk", jpk, {name:"ECDSA", namedCurve:"P-256"}, true, ["sign"]).catch(()=>null);
+  const pub=await idbGet(KEY_ID+":pub"); const pubKey = pub ? await crypto.subtle.importKey("jwk", pub, {name:"ECDSA", namedCurve:"P-256"}, true, ["verify"]).catch(()=>null) : null;
+  if(kp && pubKey){ keyPair={privateKey:kp, publicKey:pubKey}; return keyPair; } }
   return null;
 }
-
-async function generateKey() {
-  const kp = await crypto.subtle.generateKey(
-    { name:"NODE-ED25519", namedCurve:"NODE-ED25519" }, true, ["sign","verify"]
-  );
-  const pkcs8 = await crypto.subtle.exportKey("pkcs8", kp.privateKey);
-  const spki = await crypto.subtle.exportKey("spki", kp.publicKey);
-  await idbSet(KEY_ID, pkcs8);
-  await idbSet(KEY_ID + ":pub", spki);
-  keyPair = kp;
-  return kp;
+async function generateKey(){
+  const kp = await crypto.subtle.generateKey({name:"ECDSA", namedCurve:"P-256"}, true, ["sign","verify"]);
+  const jwkPriv = await crypto.subtle.exportKey("jwk", kp.privateKey);
+  const jwkPub  = await crypto.subtle.exportKey("jwk", kp.publicKey);
+  await idbSet(KEY_ID, jwkPriv); await idbSet(KEY_ID+":pub", jwkPub);
+  keyPair = { privateKey: kp.privateKey, publicKey: kp.publicKey };
+  return keyPair;
+}
+async function getPubJwk(){ const kp=await ensureKey(); if(!kp) return null; return await crypto.subtle.exportKey("jwk", kp.publicKey); }
+async function signBytes(bytes){
+  const kp=await ensureKey(); if(!kp) throw new Error("尚未生成/导入密钥");
+  return await crypto.subtle.sign({name:"ECDSA", hash:"SHA-256"}, kp.privateKey, bytes);
+}
+async function verifyBytes(pubJwk, bytes, sig){
+  const pub = await crypto.subtle.importKey("jwk", pubJwk, {name:"ECDSA", namedCurve:"P-256"}, true, ["verify"]);
+  return await crypto.subtle.verify({name:"ECDSA", hash:"SHA-256"}, pub, sig, bytes);
+}
+async function pubFingerprint(){
+  const jwk = await getPubJwk(); if(!jwk) return "-";
+  const raw = enc.encode(JSON.stringify(jwk));
+  const digest = await crypto.subtle.digest("SHA-256", raw);
+  return hex(digest).slice(0,16);
 }
 
-async function getPubKeyRaw() {
-  const kp = await ensureKey();
-  if (!kp) return null;
-  return await crypto.subtle.exportKey("spki", kp.publicKey);
+/* 标签结构与签名 */
+function sanitizeTag(o){ return { version:1, account:String(o.account||""), ownerPubKey:String(o.ownerPubKey||""), algo:"P-256",
+  balance:Number.isFinite(o.balance)?Math.max(0,Math.floor(o.balance)):0,
+  nonce:Number.isFinite(o.nonce)?Math.max(0,Math.floor(o.nonce)):0,
+  lastTx:o.lastTx?{from:String(o.lastTx.from||""), to:String(o.lastTx.to||""), amount:Number.isFinite(o.lastTx.amount)?Math.max(0,Math.floor(o.lastTx.amount)):0, ts:Number.isFinite(o.lastTx.ts)?Math.floor(o.lastTx.ts):Date.now()}:{from:"",to:"",amount:0,ts:Date.now()},
+  sig:String(o.sig||"")
+};}
+function detachSig(o){ const {sig, ...rest}=o; return rest; }
+function encodePayload(noSig){
+  const payload = { version:noSig.version, account:noSig.account, ownerPubKey:noSig.ownerPubKey, algo:noSig.algo, balance:noSig.balance, nonce:noSig.nonce, lastTx:{from:noSig.lastTx.from,to:noSig.lastTx.to,amount:noSig.lastTx.amount,ts:noSig.lastTx.ts} };
+  return enc.encode(JSON.stringify(payload));
 }
-
-async function signBytes(bytes) {
-  const kp = await ensureKey();
-  if (!kp) throw new Error("尚未生成/导入密钥");
-  const sig = await crypto.subtle.sign({ name:"NODE-ED25519" }, kp.privateKey, bytes);
-  return sig;
-}
-
-async function verifyBytes(pubSpki, bytes, sig) {
-  const pub = await crypto.subtle.importKey(
-    "spki", pubSpki, { name:"NODE-ED25519", namedCurve:"NODE-ED25519" }, false, ["verify"]
-  );
-  return await crypto.subtle.verify({ name:"NODE-ED25519" }, pub, sig, bytes);
-}
-
-async function pubFingerprint() {
-  const spki = await getPubKeyRaw();
-  if (!spki) return "-";
-  const digest = await crypto.subtle.digest("SHA-256", spki);
-  return hex(digest).slice(0, 16);
-}
-
-/* ========= 标签数据结构与签名 ========= */
-function sanitizeTag(obj) {
-  return {
-    version: 1,
-    account: String(obj.account || ""),
-    ownerPubKey: String(obj.ownerPubKey || ""),
-    balance: Number.isFinite(obj.balance) ? Math.max(0, Math.floor(obj.balance)) : 0,
-    nonce: Number.isFinite(obj.nonce) ? Math.max(0, Math.floor(obj.nonce)) : 0,
-    lastTx: obj.lastTx ? {
-      from: String(obj.lastTx.from || ""),
-      to: String(obj.lastTx.to || ""),
-      amount: Number.isFinite(obj.lastTx.amount) ? Math.max(0, Math.floor(obj.lastTx.amount)) : 0,
-      ts: Number.isFinite(obj.lastTx.ts) ? Math.floor(obj.lastTx.ts) : Date.now()
-    } : { from:"", to:"", amount:0, ts: Date.now() },
-    sig: String(obj.sig || "")
-  };
-}
-
-function detachSig(obj) {
-  const { sig, ...rest } = obj;
-  return rest;
-}
-
-function encodePayload(objNoSig) {
-  const payload = {
-    version: objNoSig.version,
-    account: objNoSig.account,
-    ownerPubKey: objNoSig.ownerPubKey,
-    balance: objNoSig.balance,
-    nonce: objNoSig.nonce,
-    lastTx: {
-      from: objNoSig.lastTx.from,
-      to: objNoSig.lastTx.to,
-      amount: objNoSig.lastTx.amount,
-      ts: objNoSig.lastTx.ts
-    }
-  };
-  const json = JSON.stringify(payload);
-  return enc.encode(json);
-}
-
-async function signTagObject(obj) {
+async function signTagObject(obj){
   const clean = sanitizeTag(obj);
-  const payloadBytes = encodePayload(detachSig(clean));
-  const sig = await signBytes(payloadBytes);
+  const payload = encodePayload(detachSig(clean));
+  const sig = await signBytes(payload);
   clean.sig = b64.to(sig);
   return clean;
 }
-
-async function verifyTagObject(obj) {
+async function verifyTagObject(obj){
   const clean = sanitizeTag(obj);
-  if (!clean.ownerPubKey || !clean.sig) return { ok:false, reason:"缺少公钥或签名" };
-  const payloadBytes = encodePayload(detachSig(clean));
-  const ok = await verifyBytes(b64.from(clean.ownerPubKey), payloadBytes, b64.from(clean.sig)).catch(()=>false);
-  return { ok, reason: ok ? "" : "签名校验失败" };
+  if (clean.algo !== "P-256") return {ok:false, reason:"算法不匹配"};
+  if (!clean.ownerPubKey || !clean.sig) return {ok:false, reason:"缺少公钥或签名"};
+  const payload = encodePayload(detachSig(clean));
+  const pubJwk = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(clean.ownerPubKey), c=>c.charCodeAt(0))));
+  const ok = await verifyBytes(pubJwk, payload, b64.from(clean.sig)).catch(()=>false);
+  return {ok, reason: ok? "" : "签名校验失败"};
 }
 
-/* ========= Web NFC 读写 ========= */
-function ensureNFC() {
-  if (!("NDEFReader" in window)) throw new Error("此浏览器不支持 Web NFC。请使用 Android Chrome 并开启 NFC。");
-}
-
-async function nfcReadOnce() {
-  ensureNFC();
-  const reader = new NDEFReader();
-  await reader.scan(); // 需要用户手势触发
-  return new Promise((resolve, reject)=>{
-    const timer = setTimeout(()=>reject(new Error("读取超时，请重试并贴近标签")), 30000);
-    reader.onreadingerror = (e)=> {
-      clearTimeout(timer);
-      reject(new Error("读取失败：" + (e?.message || "unknown")));
-    };
-    reader.onreading = (event)=> {
-      clearTimeout(timer);
-      try {
-        const { message } = event;
-        for (const record of message.records) {
-          if (record.recordType === "text" || record.mediaType === "application/json") {
-            let text = "";
-            if (record.data) {
-              text = dec.decode(record.data);
-            } else if (record.data === "" && "data" in record) {
-              text = "";
-            } else if (record.data === undefined && record.recordType === "text") {
-              // 兼容部分实现
-              text = "";
-            }
-            resolve(text);
-            return;
-          }
+/* Web NFC */
+function ensureNFC(){ if(!("NDEFReader" in window)) throw new Error("此浏览器不支持 Web NFC"); }
+async function nfcReadOnce(){
+  ensureNFC(); const reader = new NDEFReader(); await reader.scan();
+  return new Promise((resolve,reject)=>{
+    const timer=setTimeout(()=>reject(new Error("读取超时")),30000);
+    reader.onreadingerror=(e)=>{clearTimeout(timer); reject(new Error("读取失败"))};
+    reader.onreading=(ev)=>{clearTimeout(timer);
+      const {message}=ev;
+      for(const r of message.records){
+        if(r.recordType==="text"||r.mediaType==="application/json"){
+          const t = r.data ? dec.decode(r.data) : "";
+          resolve(t); return;
         }
-        resolve("");
-      } catch (err) {
-        reject(err);
       }
+      resolve("");
     };
   });
 }
+async function nfcWriteText(text){ ensureNFC(); const wr = new NDEFReader(); await wr.write({records:[{recordType:"text", data:text}]}); }
 
-async function nfcWriteText(text) {
-  ensureNFC();
-  const writer = new NDEFReader();
-  await writer.write({ records: [{ recordType: "text", data: text }] });
-}
-
-/* ========= UI 逻辑 ========= */
+/* UI */
 const el = (id)=>document.getElementById(id);
-const status = {
-  read: el("readStatus"),
-  topup: el("topupStatus"),
-  transfer: el("transferStatus"),
-  pubFp: el("pubFp"),
-  tagJson: el("tagJson"),
-};
+const status = { read: el("readStatus"), tagJson: el("tagJson"), topup: el("topupStatus"), transfer: el("transferStatus"), pubFp: el("pubFp") };
+async function refreshFp(){ status.pubFp.textContent = await pubFingerprint(); }
+function showJSON(target,obj){ target.value = JSON.stringify(obj,null,2); }
+function parseTagJSON(text){ try{ return sanitizeTag(JSON.parse(text)); }catch{ return null; } }
+async function requireAdminPassword(purpose){ const input = prompt(`${purpose}\n请输入管理员密码：`); if(input===null) return false; if(input!==ADMIN_PASSWORD){ alert("管理员密码错误"); return false; } return true; }
 
-async function refreshFp() {
-  status.pubFp.textContent = await pubFingerprint();
-}
-
-function showJSON(target, obj) {
-  target.value = JSON.stringify(obj, null, 2);
-}
-
-function parseTagJSON(text) {
-  try {
-    const obj = JSON.parse(text);
-    return sanitizeTag(obj);
-  } catch (e) {
-    return null;
-  }
-}
-
-/* ========= 管理员密码校验 ========= */
-async function requireAdminPassword(purposeText) {
-  const input = prompt(`${purposeText}\n请输入管理员密码以继续：`);
-  if (input === null) return false; // 用户取消
-  if (input !== ADMIN_PASSWORD) {
-    alert("管理员密码错误。");
-    return false;
-  }
-  return true;
-}
-
-/* ========= 事件绑定 ========= */
+/* 事件 */
 window.addEventListener("load", async ()=>{
   await ensureKey().catch(()=>{});
   await refreshFp();
 
   el("btnGenerate").addEventListener("click", async ()=>{
-    try {
-      await generateKey();
-      await refreshFp();
-      alert("密钥已生成并保存到本设备。");
-    } catch (e) {
-      alert("生成失败：" + e.message + "\n你的浏览器需支持 Ed25519 WebCrypto（Chromium 117+）");
-    }
+    try{ await generateKey(); await refreshFp(); alert("P-256 密钥已生成并保存"); }
+    catch(e){ alert("生成失败："+e.message); }
   });
 
   el("btnExport").addEventListener("click", async ()=>{
-    try {
-      const priv = await idbGet(KEY_ID);
-      const pub = await idbGet(KEY_ID + ":pub");
-      if (!priv || !pub) return alert("尚未生成/导入密钥");
-      const data = {
-        type: "nfc-wallet-ed25519",
-        createdAt: Date.now(),
-        privateKeyPkcs8_b64: b64.to(priv),
-        publicKeySpki_b64: b64.to(pub),
-      };
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = "nfc-wallet-account.json";
-      a.click();
-      URL.revokeObjectURL(a.href);
-    } catch (e) {
-      alert("导出失败：" + e.message);
-    }
+    try{
+      const jwkPriv = await idbGet(KEY_ID); const jwkPub = await idbGet(KEY_ID+":pub");
+      if(!jwkPriv||!jwkPub) return alert("尚未生成/导入密钥");
+      const data = { type:"nfc-wallet-p256", createdAt:Date.now(), privateKeyJwk:jwkPriv, publicKeyJwk:jwkPub };
+      const blob = new Blob([JSON.stringify(data,null,2)], {type:"application/json"});
+      const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download="nfc-wallet-account-p256.json"; a.click(); URL.revokeObjectURL(a.href);
+    }catch(e){ alert("导出失败："+e.message); }
   });
 
-  el("btnImport").addEventListener("click", async ()=>{
-    el("importInput").click();
-  });
+  el("btnImport").addEventListener("click", ()=> el("importInput").click());
   el("importInput").addEventListener("change", async (e)=>{
-    const file = e.target.files?.[0];
-    if (!file) return;
-    try {
-      const text = await file.text();
-      const data = JSON.parse(text);
-      if (data.type !== "nfc-wallet-ed25519") throw new Error("文件类型不匹配");
-      const priv = b64.from(data.privateKeyPkcs8_b64);
-      const pub = b64.from(data.publicKeySpki_b64);
-      const privKey = await crypto.subtle.importKey("pkcs8", priv, { name:"NODE-ED25519", namedCurve:"NODE-ED25519" }, false, ["sign"]);
-      const pubKey = await crypto.subtle.importKey("spki", pub, { name:"NODE-ED25519", namedCurve:"NODE-ED25519" }, false, ["verify"]);
-      await idbSet(KEY_ID, await crypto.subtle.exportKey("pkcs8", privKey));
-      await idbSet(KEY_ID + ":pub", await crypto.subtle.exportKey("spki", pubKey));
+    const f=e.target.files?.[0]; if(!f) return;
+    try{
+      const text = await f.text(); const data = JSON.parse(text);
+      if(data.type!=="nfc-wallet-p256") throw new Error("文件类型不匹配");
+      const privKey = await crypto.subtle.importKey("jwk", data.privateKeyJwk, {name:"ECDSA", namedCurve:"P-256"}, true, ["sign"]);
+      const pubKey  = await crypto.subtle.importKey("jwk", data.publicKeyJwk,  {name:"ECDSA", namedCurve:"P-256"}, true, ["verify"]);
+      await idbSet(KEY_ID, await crypto.subtle.exportKey("jwk", privKey));
+      await idbSet(KEY_ID+":pub", await crypto.subtle.exportKey("jwk", pubKey));
       keyPair = { privateKey: privKey, publicKey: pubKey };
-      await refreshFp();
-      alert("导入成功");
-    } catch (err) {
-      alert("导入失败：" + err.message);
-    } finally {
-      e.target.value = "";
-    }
+      await refreshFp(); alert("导入成功");
+    }catch(err){ alert("导入失败："+err.message); } finally { e.target.value=""; }
   });
 
   el("btnRead").addEventListener("click", async ()=>{
-    status.read.textContent = "请将手机贴近标签读取...";
-    status.read.className = "muted";
-    try {
+    status.read.textContent="请将手机贴近标签读取..."; status.read.className="muted";
+    try{
       const text = await nfcReadOnce();
-      if (!text) {
-        status.read.textContent = "读取完成：未找到文本记录（可能是空标签或非本系统标签）";
-        status.tagJson.value = "";
-        return;
-      }
+      if(!text){ status.read.textContent="读取完成：未找到文本记录"; status.tagJson.value=""; return; }
       const obj = parseTagJSON(text);
-      if (!obj) {
-        status.read.textContent = "读取完成：JSON 解析失败（不是本系统格式）";
-        status.read.className = "err";
-        status.tagJson.value = text;
-        return;
-      }
-      const vr = await verifyTagObject(obj);
-      status.read.textContent = vr.ok ? "读取完成：签名有效" : `读取完成：签名无效 ${vr.reason ? "(" + vr.reason + ")" : ""}`;
-      status.read.className = vr.ok ? "ok" : "err";
-      showJSON(status.tagJson, obj);
-    } catch (e) {
-      status.read.textContent = "读取失败：" + e.message;
-      status.read.className = "err";
-    }
+      if(!obj){ status.read.textContent="读取完成：JSON 解析失败"; status.read.className="err"; status.tagJson.value=text; return; }
+      if(obj.algo!=="P-256"){ status.read.textContent="读取完成：算法不匹配（该标签可能是旧版 Ed25519）"; status.read.className="err"; showJSON(status.tagJson,obj); return; }
+      // 验签
+      const payload = (o)=> enc.encode(JSON.stringify({version:o.version, account:o.account, ownerPubKey:o.ownerPubKey, algo:o.algo, balance:o.balance, nonce:o.nonce, lastTx:o.lastTx}));
+      const pubJwk = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(obj.ownerPubKey), c=>c.charCodeAt(0))));
+      const ok = await verifyBytes(pubJwk, payload(obj), b64.from(obj.sig)).catch(()=>false);
+      status.read.textContent = ok ? "读取完成：签名有效" : "读取完成：签名无效";
+      status.read.className = ok ? "ok" : "err";
+      showJSON(status.tagJson,obj);
+    }catch(e){ status.read.textContent="读取失败："+e.message; status.read.className="err"; }
   });
 
   el("btnInit").addEventListener("click", async ()=>{
-    try {
-      const passOK = await requireAdminPassword("将要初始化/重置标签，这会覆盖原有内容。");
-      if (!passOK) return;
-
-      const bal = Math.max(0, Math.floor(Number(el("initBalance").value || 0)));
-      const acc = (el("initAccount").value || "").trim() || uid("acct");
-      const pub = await getPubKeyRaw();
-      if (!pub) return alert("请先生成或导入密钥");
-      const tag = await signTagObject({
-        version:1,
-        account: acc,
-        ownerPubKey: b64.to(pub),
-        balance: bal,
-        nonce: 0,
-        lastTx: { from:"", to:acc, amount:bal, ts: Date.now() }
-      });
+    try{
+      const passOK = await requireAdminPassword("初始化/重置将覆盖标签数据"); if(!passOK) return;
+      const bal = Math.max(0, Math.floor(Number(el("initBalance").value||0)));
+      const acc = (el("initAccount").value||"").trim() || uid();
+      const pubJwk = await getPubJwk(); if(!pubJwk) return alert("请先生成或导入密钥");
+      const ownerPubKeyB64 = btoa(JSON.stringify(pubJwk));
+      const tag = await signTagObject({ version:1, account:acc, ownerPubKey: ownerPubKeyB64, algo:"P-256", balance:bal, nonce:0, lastTx:{from:"",to:acc,amount:bal,ts:Date.now()} });
       const text = JSON.stringify(tag);
-      if (text.length > 800) {
-        return alert("数据长度超出大部分 NDEF 标签容量，请减少字段或数值大小");
-      }
-      if (!confirm("将覆盖标签上的文本记录，确认继续？")) return;
-      await nfcWriteText(text);
-      alert("写入完成。");
-    } catch (e) {
-      alert("初始化失败：" + e.message);
-    }
+      if(text.length>800) return alert("数据长度可能超过标签容量");
+      if(!confirm("将覆盖标签上的文本记录，确认继续？")) return;
+      await nfcWriteText(text); alert("写入完成。");
+    }catch(e){ alert("初始化失败："+e.message); }
   });
 
   el("btnTopup").addEventListener("click", async ()=>{
-    status.topup.textContent = "请将手机贴近要充值的标签...";
-    status.topup.className = "muted";
-    try {
-      const passOK = await requireAdminPassword("执行充值操作需要管理员密码。");
-      if (!passOK) { status.topup.textContent = "已取消"; return; }
-
+    status.topup.textContent="请贴近要充值的标签..."; status.topup.className="muted";
+    try{
+      const passOK = await requireAdminPassword("执行充值需要管理员密码"); if(!passOK){ status.topup.textContent="已取消"; return; }
       const text = await nfcReadOnce();
-      const obj = parseTagJSON(text);
-      if (!obj) throw new Error("读取到的标签不是有效 JSON");
-      const vr = await verifyTagObject(obj);
-      if (!vr.ok) throw new Error("原始标签签名无效，拒绝充值");
-
-      const amount = Math.max(1, Math.floor(Number(el("topupAmount").value || 0)));
-      obj.balance = Math.max(0, obj.balance + amount);
-      obj.nonce += 1;
-      obj.lastTx = { from:"external", to: obj.account, amount, ts: Date.now() };
+      const obj = parseTagJSON(text); if(!obj) throw new Error("无效 JSON");
+      if(obj.algo!=="P-256") throw new Error("算法不匹配（非本兼容版标签）");
+      // 验签
+      const pubJwk = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(obj.ownerPubKey), c=>c.charCodeAt(0))));
+      const payload = enc.encode(JSON.stringify({version:obj.version,account:obj.account,ownerPubKey:obj.ownerPubKey,algo:obj.algo,balance:obj.balance,nonce:obj.nonce,lastTx:obj.lastTx}));
+      const ok = await verifyBytes(pubJwk, payload, b64.from(obj.sig)); if(!ok) throw new Error("原始标签签名无效");
+      const amount = Math.max(1, Math.floor(Number(el("topupAmount").value||0)));
+      obj.balance += amount; obj.nonce += 1; obj.lastTx = {from:"external", to:obj.account, amount, ts:Date.now()};
       const newObj = await signTagObject(obj);
-
-      const textOut = JSON.stringify(newObj);
-      if (textOut.length > 800) throw new Error("数据过大，写入可能失败");
-      if (!confirm(`将对账户 ${obj.account} 充值 ${amount}，确认写入？`)) return;
-
-      await nfcWriteText(textOut);
-      status.topup.textContent = "充值完成";
-      status.topup.className = "ok";
-      showJSON(status.tagJson, newObj);
-    } catch (e) {
-      status.topup.textContent = "充值失败：" + e.message;
-      status.topup.className = "err";
-    }
+      const out = JSON.stringify(newObj);
+      if(out.length>800) throw new Error("数据过大");
+      if(!confirm(`将对账户 ${obj.account} 充值 ${amount}，确认写入？`)) return;
+      await nfcWriteText(out); status.topup.textContent="充值完成"; status.topup.className="ok"; showJSON(status.tagJson,newObj);
+    }catch(e){ status.topup.textContent="充值失败："+e.message; status.topup.className="err"; }
   });
 
   el("btnTransfer").addEventListener("click", async ()=>{
-    status.transfer.textContent = "步骤1/4：请贴近来源标签 A 读取...";
-    status.transfer.className = "muted";
-
-    try {
-      const amount = Math.max(1, Math.floor(Number(el("transferAmount").value || 0)));
-
-      // 读 A
-      const textA = await nfcReadOnce();
-      const A = parseTagJSON(textA);
-      if (!A) throw new Error("标签 A 不是有效 JSON");
-      const vA = await verifyTagObject(A);
-      if (!vA.ok) throw new Error("标签 A 签名无效");
-      if (A.balance < amount) throw new Error("标签 A 余额不足");
-
-      // 确认
-      if (!confirm(`确认从账户 A (${A.account}) 转出 ${amount}？\n下一步将读取账户 B。`)) {
-        status.transfer.textContent = "已取消";
-        return;
+    status.transfer.textContent="步骤1/4：请贴 A 读取..."; status.transfer.className="muted";
+    try{
+      const amount = Math.max(1, Math.floor(Number(el("transferAmount").value||0)));
+      // 读A
+      const textA = await nfcReadOnce(); const A = parseTagJSON(textA); if(!A) throw new Error("A 无效");
+      if(A.algo!=="P-256") throw new Error("A 算法不匹配");
+      // 验 A
+      {
+        const pubA = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(A.ownerPubKey), c=>c.charCodeAt(0))));
+        const payloadA = enc.encode(JSON.stringify({version:A.version,account:A.account,ownerPubKey:A.ownerPubKey,algo:A.algo,balance:A.balance,nonce:A.nonce,lastTx:A.lastTx}));
+        const okA = await verifyBytes(pubA, payloadA, b64.from(A.sig)); if(!okA) throw new Error("A 签名无效");
       }
+      if(A.balance < amount) throw new Error("A 余额不足");
+      // 确认
+      if(!confirm(`确认从账户 A (${A.account}) 转出 ${amount}？\n下一步将读取账户 B。`)){ status.transfer.textContent="已取消"; return; }
+      // 读B
+      status.transfer.textContent="步骤2/4：请贴 B 读取...";
+      const textB = await nfcReadOnce(); const B = parseTagJSON(textB); if(!B) throw new Error("B 无效");
+      if(B.algo!=="P-256") throw new Error("B 算法不匹配");
+      // 验 B
+      {
+        const pubB = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(B.ownerPubKey), c=>c.charCodeAt(0))));
+        const payloadB = enc.encode(JSON.stringify({version:B.version,account:B.account,ownerPubKey:B.ownerPubKey,algo:B.algo,balance:B.balance,nonce:B.nonce,lastTx:B.lastTx}));
+        const okB = await verifyBytes(pubB, payloadB, b64.from(B.sig)); if(!okB) throw new Error("B 签名无效");
+      }
+      if(A.account === B.account) throw new Error("A 与 B 相同，禁止转账");
 
-      // 读 B
-      status.transfer.textContent = "步骤2/4：请贴近目标标签 B 读取...";
-      const textB = await nfcReadOnce();
-      const B = parseTagJSON(textB);
-      if (!B) throw new Error("标签 B 不是有效 JSON");
-      const vB = await verifyTagObject(B);
-      if (!vB.ok) throw new Error("标签 B 签名无效");
-
-      if (A.account === B.account) throw new Error("账户 A 与 B 相同，禁止转账");
-
-      // 更新内存状态
-      const A2 = sanitizeTag(A);
-      const B2 = sanitizeTag(B);
-      A2.balance -= amount; A2.nonce += 1;
-      B2.balance += amount; B2.nonce += 1;
+      // 更新并签名
       const now = Date.now();
-      A2.lastTx = { from:A.account, to:B.account, amount, ts: now };
-      B2.lastTx = { from:A.account, to:B.account, amount, ts: now };
-
-      const A3 = await signTagObject(A2);
-      const B3 = await signTagObject(B2);
+      const A2 = {...A, balance:A.balance-amount, nonce:A.nonce+1, lastTx:{from:A.account,to:B.account,amount,ts:now}};
+      const B2 = {...B, balance:B.balance+amount, nonce:B.nonce+1, lastTx:{from:A.account,to:B.account,amount,ts:now}};
+      const A3 = await signTagObject(A2); const B3 = await signTagObject(B2);
 
       // 写回 A
-      status.transfer.textContent = "步骤3/4：请贴近标签 A 写回更新...";
-      if (!confirm(`将从 ${A.account} 向 ${B.account} 转账 ${amount}。\n先写回 A，再写回 B，确认？`)) {
-        status.transfer.textContent = "已取消";
-        return;
-      }
+      status.transfer.textContent="步骤3/4：请贴近标签 A 写回...";
+      if(!confirm(`即将从 ${A.account} 向 ${B.account} 转账 ${amount}。\n先写回 A，再写回 B，确认？`)){ status.transfer.textContent="已取消"; return; }
       await nfcWriteText(JSON.stringify(A3));
-
       // 写回 B
-      status.transfer.textContent = "步骤4/4：请贴近标签 B 写回更新...";
+      status.transfer.textContent="步骤4/4：请贴近标签 B 写回...";
       await nfcWriteText(JSON.stringify(B3));
 
-      status.transfer.textContent = "转账完成";
-      status.transfer.className = "ok";
-      showJSON(status.tagJson, { A: A3, B: B3 });
-    } catch (e) {
-      status.transfer.textContent = "转账失败：" + e.message + "（若已部分写入，请手动修正）";
-      status.transfer.className = "err";
-    }
+      status.transfer.textContent="转账完成"; status.transfer.className="ok"; showJSON(status.tagJson,{A:A3,B:B3});
+    }catch(e){ status.transfer.textContent="转账失败："+e.message+"（若已部分写入，请手动修正）"; status.transfer.className="err"; }
   });
 });
 </script>
