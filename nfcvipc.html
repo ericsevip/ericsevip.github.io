@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>NFC 商户版（NTAG213 + 本机账本防复制）</title>
+<style>
+  :root { color-scheme: light dark; --bg:#0b0c0f; --card:#12141a; --muted:#7a8193; --text:#e8ebf1; --brand:#3b82f6; --danger:#ef4444; --ok:#22c55e; --warn:#f59e0b; --border:#202534; }
+  html,body{margin:0;padding:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,PingFang SC,Noto Sans SC,Arial,sans-serif;background:#0b0c0f;color:var(--text)}
+  .wrap{max-width:960px;margin:0 auto;padding:16px}
+  h1{font-size:1.25rem;margin:12px 0 8px} h2{font-size:1.05rem;margin:18px 0 8px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px;margin:12px 0}
+  .row{display:flex;gap:10px;flex-wrap:wrap}.col{flex:1 1 240px;min-width:220px}
+  label{display:block;font-size:.9rem;color:var(--muted);margin:6px 0 4px}
+  input,textarea{width:100%;box-sizing:border-box;padding:10px;border-radius:10px;border:1px solid var(--border);background:#0f1219;color:var(--text)}
+  textarea{min-height:100px;resize:vertical}
+  button{padding:10px 14px;border:1px solid var(--border);background:#111726;color:var(--text);border-radius:10px;cursor:pointer}
+  button.primary{background:var(--brand);border-color:transparent;color:#fff}
+  button.warn{background:var(--warn);border-color:transparent;color:#000}
+  button.ghost{background:transparent} button:disabled{opacity:.5;cursor:not-allowed}
+  .muted{color:var(--muted)} .ok{color:var(--ok)} .err{color:var(--danger)}
+  .pill{display:inline-block;padding:2px 8px;border-radius:999px;background:#101626;border:1px solid var(--border);font-size:.8rem;color:var(--muted)}
+  .hr{height:1px;background:var(--border);margin:10px 0}
+  .kbd{padding:1px 6px;border:1px solid var(--border);border-radius:6px;background:#0f1219}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>NFC 商户版（NTAG213 + 本机账本防复制）</h1>
+  <div class="muted">
+    - 卡面格式：{"v":1,"a":"账号","b":余额,"n":序号}（极简，适配 NTAG213）<br>
+    - 本机 localStorage 记录每个账户的最新余额与序号，检测复制/回放。<br>
+    - 扣款需管理员密码；初始化/重置会同步更新本机账本。<br>
+    - 管理员密码：50c89cd7bda16185（可在代码顶部修改）。<br>
+    - 建议 Android Chrome + HTTPS 或 localhost。<br>
+  </div>
+
+  <div class="card">
+    <h2>读取标签</h2>
+    <div class="row">
+      <div class="col"><button id="btnRead" class="primary">读取标签</button></div>
+      <div class="col"><div id="readStatus" class="muted">尚未读取</div></div>
+    </div>
+    <div class="hr"></div>
+    <label>标签内容（JSON 原文）</label>
+    <textarea id="tagJson" readonly></textarea>
+    <div id="ledgerHint" class="muted" style="margin-top:6px"></div>
+  </div>
+
+  <div class="card">
+    <h2>初始化/重置（需管理员密码）</h2>
+    <div class="row">
+      <div class="col">
+        <label>初始余额（正整数）</label>
+        <input id="initBalance" type="number" min="0" step="1" value="100">
+      </div>
+      <div class="col">
+        <label>账户标识（留空自动生成短ID）</label>
+        <input id="initAccount" placeholder="如空自动生成">
+      </div>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button id="btnInit" class="warn">初始化/重置（覆盖标签）</button>
+      <span class="muted">写卡成功后，同步更新本机账本。</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>扣款（仅扣钱，不转账）</h2>
+    <div class="row">
+      <div class="col">
+        <label>扣款金额（正整数）</label>
+        <input id="spendAmount" type="number" min="1" step="1" value="10">
+      </div>
+      <div class="col">
+        <label>消费备注（可选，仅显示不写卡）</label>
+        <input id="spendNote" placeholder="如：拿铁一杯">
+      </div>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button id="btnSpend" class="primary">读取并扣款</button>
+      <button id="btnForceSpend" class="ghost" title="当被判定为回放/复制时可用" disabled>强制扣款</button>
+      <span id="spendStatus" class="muted"></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>本机账本</h2>
+    <div class="muted">
+      - 保存在浏览器 localStorage，仅本设备本浏览器可见。<br>
+      - 清空账本不会影响卡片，但会失去防回放能力。<br>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button id="btnExport" class="ghost">导出账本JSON</button>
+      <button id="btnImport" class="ghost">导入账本JSON</button>
+      <button id="btnClear" class="ghost">清空账本</button>
+      <span id="ledgerStatus" class="muted"></span>
+    </div>
+    <div class="hr"></div>
+    <label>账本预览</label>
+    <textarea id="ledgerView" readonly></textarea>
+  </div>
+
+  <div class="muted" style="margin-top:8px">
+    提示：localStorage 是“本机本浏览器”级别，换设备/浏览器需要导出再导入以保持连续性。
+  </div>
+</div>
+
+<script>
+/* 管理员密码（可修改） */
+const ADMIN_PASSWORD = "50c89cd7bda16185";
+
+/* 编解码工具 */
+const enc = new TextEncoder(), dec = new TextDecoder();
+
+/* 极简数据结构与帮助函数 */
+function uidShort(prefix="a"){
+  const a = crypto.getRandomValues(new Uint8Array(4));
+  return `${prefix}-${[...a].map(x=>x.toString(16).padStart(2,"0")).join("")}`;
+}
+function sanitizeMinimal(obj){
+  return {
+    v: 1,
+    a: String(obj?.a || ""),
+    b: Number.isFinite(obj?.b) ? Math.max(0, Math.floor(obj.b)) : 0,
+    n: Number.isFinite(obj?.n) ? Math.max(0, Math.floor(obj.n)) : 0
+  };
+}
+function parseMinimal(text){
+  try{
+    const obj = JSON.parse(text);
+    if (typeof obj !== "object" || obj === null) return null;
+    const clean = sanitizeMinimal(obj);
+    if (!clean.a) return null;
+    return clean;
+  }catch{ return null; }
+}
+
+/* Web NFC */
+function ensureNFC(){
+  if(!("NDEFReader" in window)) throw new Error("此浏览器不支持 Web NFC（请用 Android Chrome 并开启 NFC）");
+}
+async function nfcReadOnce(timeoutMs=30000){
+  ensureNFC();
+  const reader = new NDEFReader();
+  await reader.scan();
+  return new Promise((resolve, reject)=>{
+    const t = setTimeout(()=>reject(new Error("读取超时")), timeoutMs);
+    reader.onreadingerror = ()=>{ clearTimeout(t); reject(new Error("读取失败")); };
+    reader.onreading = (ev)=>{
+      clearTimeout(t);
+      try{
+        const { message } = ev;
+        for(const rec of message.records){
+          if(rec.recordType==="text" || rec.mediaType==="application/json"){
+            const text = rec.data ? dec.decode(rec.data) : "";
+            resolve(text);
+            return;
+          }
+        }
+        resolve("");
+      }catch(e){ reject(e); }
+    };
+  });
+}
+async function nfcWriteText(text){
+  ensureNFC();
+  if (new Blob([text]).size > 120) {
+    throw new Error("数据过大（超过 NTAG213 建议长度）");
+  }
+  const writer = new NDEFReader();
+  await writer.write({ records: [{ recordType: "text", data: text }] });
+}
+
+/* 本机账本：localStorage 键名与读写 */
+const LS_KEY = "nfc_merchant_ledger_v1"; // 全局账本
+function loadLedger(){
+  try{
+    const j = localStorage.getItem(LS_KEY);
+    const obj = j ? JSON.parse(j) : {};
+    return (obj && typeof obj === "object") ? obj : {};
+  }catch{ return {}; }
+}
+function saveLedger(ledger){
+  localStorage.setItem(LS_KEY, JSON.stringify(ledger));
+}
+function getAcct(ledger, a){
+  return ledger[a] || null;
+}
+function setAcct(ledger, a, state){
+  ledger[a] = { b: state.b|0, n: state.n|0, t: Date.now() };
+}
+function delAll(){
+  localStorage.removeItem(LS_KEY);
+}
+
+/* UI 绑定 */
+const $ = (id)=>document.getElementById(id);
+const S = {
+  read: $("readStatus"),
+  tagJson: $("tagJson"),
+  hint: $("ledgerHint"),
+  spend: $("spendStatus"),
+  ledgerStatus: $("ledgerStatus"),
+  ledgerView: $("ledgerView"),
+  btnForce: $("btnForceSpend")
+};
+function refreshLedgerView(){
+  const ledger = loadLedger();
+  S.ledgerView.value = JSON.stringify(ledger, null, 2);
+}
+function showJSON(target, obj){ target.value = typeof obj === "string" ? obj : JSON.stringify(obj, null, 2); }
+
+async function requireAdminPassword(purpose){
+  const input = prompt(`${purpose}\n请输入管理员密码：`);
+  if (input === null) return false;
+  if (input !== ADMIN_PASSWORD) { alert("管理员密码错误"); return false; }
+  return true;
+}
+
+/* 复制/回放检测逻辑 */
+function evaluateReplay(card, known){
+  // 返回 {status: "ok" | "suspicious" | "newer" | "unknown", message}
+  if (!known) {
+    return { status: "unknown", message: "本机无该账户记录（首次见）。" };
+  }
+  if (card.n < known.n || card.b < known.b) {
+    return { status: "suspicious", message: `疑似回放/复制：卡(n=${card.n},b=${card.b}) < 本机(n=${known.n},b=${known.b})。` };
+  }
+  if (card.n === known.n && card.b === known.b) {
+    return { status: "ok", message: "与本机记录一致。" };
+  }
+  // 其余视为“卡更新更近”（可能他处充值/扣款）
+  return { status: "newer", message: `卡片较新：卡(n=${card.n},b=${card.b}) ≥ 本机(n=${known.n},b=${known.b})。` };
+}
+
+/* 事件 */
+window.addEventListener("load", ()=>{
+  refreshLedgerView();
+
+  // 读取
+  $("btnRead").addEventListener("click", async ()=>{
+    S.read.textContent = "请贴近标签读取...";
+    S.read.className = "muted";
+    S.hint.textContent = "";
+    try{
+      const text = await nfcReadOnce();
+      if (!text) { S.read.textContent = "读取完成：无文本记录（可能是空卡）"; S.tagJson.value = ""; return; }
+      const card = parseMinimal(text);
+      if (!card) {
+        S.read.textContent = "读取完成：不是本系统的极简格式";
+        S.read.className = "err";
+        S.tagJson.value = text;
+        return;
+      }
+      const ledger = loadLedger();
+      const known = getAcct(ledger, card.a);
+      const evalRes = evaluateReplay(card, known);
+
+      S.read.textContent = `读取完成：账户=${card.a} 余额=${card.b} 序号=${card.n}`;
+      S.read.className = evalRes.status === "suspicious" ? "err" : (evalRes.status === "ok" ? "ok" : "muted");
+      S.hint.textContent = evalRes.message;
+      showJSON(S.tagJson, card);
+      // 不自动覆盖本机记录，仅在明确操作后更新
+      // 但如果 known 不存在，可选自动登记
+      if (!known) {
+        setAcct(ledger, card.a, card);
+        saveLedger(ledger);
+        refreshLedgerView();
+      }
+    }catch(e){
+      S.read.textContent = "读取失败：" + e.message;
+      S.read.className = "err";
+    }
+  });
+
+  // 初始化/重置
+  $("btnInit").addEventListener("click", async ()=>{
+    try{
+      const ok = await requireAdminPassword("初始化/重置将覆盖标签内容");
+      if(!ok) return;
+
+      const bal = Math.max(0, Math.floor(Number($("initBalance").value || 0)));
+      const acc = ($("initAccount").value || "").trim() || uidShort("a");
+      const data = sanitizeMinimal({ a: acc, b: bal, n: 0 });
+      const text = JSON.stringify(data);
+
+      if (!confirm(`将初始化标签：\n账户=${data.a}\n余额=${data.b}\n确认写入？`)) return;
+      await nfcWriteText(text);
+
+      // 写卡成功后，更新账本
+      const ledger = loadLedger();
+      setAcct(ledger, data.a, data);
+      saveLedger(ledger);
+      refreshLedgerView();
+
+      alert("写入完成，并已更新本机账本。");
+    }catch(e){
+      alert("初始化失败：" + e.message);
+    }
+  });
+
+  // 扣款（常规）
+  $("btnSpend").addEventListener("click", async ()=>{
+    S.spend.textContent = "请贴近要扣款的标签...";
+    S.spend.className = "muted";
+    S.btnForce.disabled = true;
+    try{
+      const ok = await requireAdminPassword("执行扣款需要管理员密码");
+      if(!ok){ S.spend.textContent = "已取消"; return; }
+
+      const text = await nfcReadOnce();
+      const card = parseMinimal(text);
+      if (!card) throw new Error("不是本系统的极简格式");
+
+      const ledger = loadLedger();
+      const known = getAcct(ledger, card.a);
+      const evalRes = evaluateReplay(card, known);
+      if (evalRes.status === "suspicious") {
+        S.spend.textContent = "检测到回放/复制，已阻止扣款。可点“强制扣款”继续。";
+        S.spend.className = "err";
+        S.btnForce.disabled = false;
+        // 暂存最近一次读到的卡数据以便强制流程使用
+        window.__lastCard__ = card;
+        return;
+      }
+
+      const amount = Math.max(1, Math.floor(Number($("spendAmount").value || 0)));
+      if (card.b < amount) throw new Error("余额不足，无法扣款");
+
+      const note = ($("spendNote").value || "").trim();
+      const newCard = sanitizeMinimal(card);
+      newCard.b -= amount;
+      newCard.n += 1;
+
+      const out = JSON.stringify(newCard);
+      if (!confirm(`账户 ${card.a}\n本次扣款：${amount}\n扣后余额：${newCard.b}\n${note ? "备注：" + note + "\n" : ""}确认写入？`)) {
+        S.spend.textContent = "已取消";
+        return;
+      }
+
+      await nfcWriteText(out);
+
+      // 写卡成功后，同步账本
+      setAcct(ledger, newCard.a, newCard);
+      saveLedger(ledger);
+      refreshLedgerView();
+
+      S.spend.textContent = "扣款完成，已更新本机账本。";
+      S.spend.className = "ok";
+      showJSON(S.tagJson, newCard);
+      S.btnForce.disabled = true;
+    }catch(e){
+      S.spend.textContent = "扣款失败：" + e.message;
+      S.spend.className = "err";
+    }
+  });
+
+  // 强制扣款（在判定为回放/复制时使用）
+  $("btnForceSpend").addEventListener("click", async ()=>{
+    const card = window.__lastCard__;
+    if (!card) { alert("无待处理的卡片数据，请先读取卡。"); return; }
+    try{
+      const ok = await requireAdminPassword("强制扣款风险自担，请再次输入管理员密码");
+      if(!ok) return;
+
+      const amount = Math.max(1, Math.floor(Number($("spendAmount").value || 0)));
+      if (card.b < amount) { alert("余额不足，无法强制扣款"); return; }
+
+      const note = ($("spendNote").value || "").trim();
+      const newCard = sanitizeMinimal(card);
+      newCard.b -= amount;
+      newCard.n += 1;
+
+      const out = JSON.stringify(newCard);
+      if (!confirm(`【强制扣款】账户 ${card.a}\n本次扣款：${amount}\n扣后余额：${newCard.b}\n${note ? "备注：" + note + "\n" : ""}确认写入？`)) return;
+
+      await nfcWriteText(out);
+
+      // 强制模式下也要以新状态更新本机账本，避免下一次又被视为落后
+      const ledger = loadLedger();
+      setAcct(ledger, newCard.a, newCard);
+      saveLedger(ledger);
+      refreshLedgerView();
+
+      alert("强制扣款完成，并已更新本机账本。");
+      S.btnForce.disabled = true;
+      S.spend.textContent = "强制扣款完成";
+      S.spend.className = "ok";
+      showJSON(S.tagJson, newCard);
+      window.__lastCard__ = null;
+    }catch(e){
+      alert("强制扣款失败：" + e.message);
+    }
+  });
+
+  // 账本工具
+  $("btnExport").addEventListener("click", ()=>{
+    try{
+      const ledger = loadLedger();
+      const blob = new Blob([JSON.stringify(ledger, null, 2)], {type:"application/json"});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = "ledger.json"; a.click();
+      URL.revokeObjectURL(url);
+      S.ledgerStatus.textContent = "已导出。";
+    }catch(e){
+      S.ledgerStatus.textContent = "导出失败：" + e.message;
+    }
+  });
+  $("btnImport").addEventListener("click", ()=>{
+    const inp = document.createElement("input");
+    inp.type = "file"; inp.accept = "application/json";
+    inp.onchange = ()=>{
+      const f = inp.files[0];
+      if (!f) return;
+      const r = new FileReader();
+      r.onload = ()=>{
+        try{
+          const obj = JSON.parse(String(r.result || "{}"));
+          if (!obj || typeof obj !== "object") throw new Error("格式不正确");
+          saveLedger(obj);
+          refreshLedgerView();
+          S.ledgerStatus.textContent = "已导入。";
+        }catch(e){ S.ledgerStatus.textContent = "导入失败：" + e.message; }
+      };
+      r.readAsText(f);
+    };
+    inp.click();
+  });
+  $("btnClear").addEventListener("click", ()=>{
+    if (!confirm("确认清空本机账本？此操作不可恢复。")) return;
+    delAll();
+    refreshLedgerView();
+    S.ledgerStatus.textContent = "已清空账本。";
+  });
+});
+</script>
+</body>
+</html>
