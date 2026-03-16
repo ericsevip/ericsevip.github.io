@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>礼品卡 + 储值会员卡（积分可开关）｜本机账本防复制</title>
+<style>
+  :root { color-scheme: light dark; --bg:#0b0f14; --card:#121722; --muted:#8a93a7; --text:#e9edf4; --brand:#3b82f6; --danger:#ef4444; --ok:#22c55e; --warn:#f59e0b; --border:#1e2633 }
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,Segoe UI,Roboto,PingFang SC,Noto Sans SC,Arial,sans-serif}
+  .wrap{max-width:1080px;margin:0 auto;padding:14px}
+  h1{font-size:1.25rem;margin:10px 0 6px} h2{font-size:1.05rem;margin:14px 0 8px}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:12px;margin:12px 0}
+  .row{display:flex;gap:10px;flex-wrap:wrap}.col{flex:1 1 240px;min-width:220px}
+  label{display:block;font-size:.9rem;color:var(--muted);margin:6px 0 4px}
+  input,select,textarea{width:100%;box-sizing:border-box;padding:10px;border-radius:10px;border:1px solid var(--border);background:#0f1522;color:var(--text)}
+  textarea{min-height:110px;resize:vertical}
+  button{padding:10px 14px;border:1px solid var(--border);background:#111a2a;color:var(--text);border-radius:10px;cursor:pointer}
+  button.primary{background:var(--brand);border-color:transparent;color:#fff}
+  button.warn{background:var(--warn);border-color:transparent;color:#000}
+  button.ghost{background:transparent}
+  button:disabled{opacity:.55;cursor:not-allowed}
+  .muted{color:var(--muted)} .ok{color:var(--ok)} .err{color:var(--danger)}
+  .hr{height:1px;background:var(--border);margin:10px 0}
+  .kbd{padding:1px 6px;border:1px solid var(--border);border-radius:6px;background:#0f1522}
+  .pill{display:inline-block;padding:2px 8px;border-radius:999px;background:#0d1522;border:1px solid var(--border);font-size:.8rem;color:var(--muted)}
+  ul{margin:6px 0 0 1em}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>礼品卡 + 储值会员卡（积分可开关）</h1>
+  <div class="muted">
+    - 卡面结构（JSON 文本写入 NFC）：{"v":1,"t":"G|M","a":"账号","b":余额,"n":序号,"m":0/1}<br>
+    - 无 t 的旧卡按 t="M" 识别；写回时会补上。<br>
+    - 本机 localStorage 做账本与积分，提供回放检测；扣款免密，强制扣款需密码。<br>
+  </div>
+
+  <div class="card">
+    <h2>模式选择</h2>
+    <div class="row">
+      <div class="col">
+        <label>发卡类型</label>
+        <select id="issueType">
+          <option value="G">礼品卡（不可充值，不参与积分）</option>
+          <option value="M" selected>储值会员卡（可充值、可积分）</option>
+        </select>
+      </div>
+      <div class="col">
+        <label>管理员提示</label>
+        <div class="pill">默认扣款免密｜强制扣款与清空账本需密码</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>读取标签</h2>
+    <div class="row">
+      <div class="col"><button id="btnRead" class="primary">读取</button></div>
+      <div class="col"><div id="readStatus" class="muted">尚未读取</div></div>
+    </div>
+    <div class="hr"></div>
+    <label>标签内容（JSON）</label>
+    <textarea id="tagJson" readonly></textarea>
+    <div id="hint" class="muted" style="margin-top:6px"></div>
+  </div>
+
+  <div class="card">
+    <h2>发卡</h2>
+    <div class="row">
+      <div class="col">
+        <label>初始余额（整数元）</label>
+        <input id="initBalance" type="number" min="0" step="1" value="100">
+      </div>
+      <div class="col">
+        <label>账户标识（留空自动生成）</label>
+        <input id="initAccount" placeholder="如空自动生成">
+      </div>
+      <div class="col">
+        <label>会员开关（仅对储值会员卡有效）</label>
+        <select id="initMember">
+          <option value="1">开启</option>
+          <option value="0" selected>关闭</option>
+        </select>
+      </div>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button id="btnIssue" class="warn">写卡（发卡）</button>
+      <span class="muted">将按上方“发卡类型”写入 t=G 或 t=M。礼品卡不可充值。</span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>充值（仅储值会员卡）</h2>
+    <div class="row">
+      <div class="col">
+        <label>充值金额（整数元）</label>
+        <input id="topupAmount" type="number" min="1" step="1" value="50">
+      </div>
+      <div class="col">
+        <label>备注（可选）</label>
+        <input id="topupNote" placeholder="如：现金充值">
+      </div>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button id="btnTopup" class="primary">读取并充值</button>
+      <span id="topupStatus" class="muted"></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>消费/扣款（默认免密）</h2>
+    <div class="row">
+      <div class="col">
+        <label>消费金额（整数元）</label>
+        <input id="spendAmount" type="number" min="1" step="1" value="10">
+      </div>
+      <div class="col">
+        <label>使用积分抵扣（仅储值会员卡且会员开启时）</label>
+        <input id="usePoints" type="checkbox"> <span class="muted">自动按规则抵扣</span>
+      </div>
+      <div class="col">
+        <label>备注（可选）</label>
+        <input id="spendNote" placeholder="如：饮品">
+      </div>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button id="btnSpend" class="primary">读取并扣款（免密）</button>
+      <button id="btnForceSpend" class="ghost" disabled>强制扣款（需管理员密码）</button>
+      <span id="spendStatus" class="muted"></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>积分与礼品（仅储值会员卡且会员开启时生效）</h2>
+    <div class="muted">
+      - 设置积分规则后，储值会员卡消费可累计/抵扣；礼品卡不参与。<br>
+    </div>
+    <div class="row">
+      <div class="col">
+        <label>获取比例：每消费 1 元得多少分</label>
+        <input id="cfgEarnPerYuan" type="number" min="0" step="0.01" value="1">
+      </div>
+      <div class="col">
+        <label>抵扣比例：1 分可抵扣多少元</label>
+        <input id="cfgCashPerPoint" type="number" min="0" step="0.01" value="0.1">
+      </div>
+      <div class="col">
+        <label>每次最多可用积分</label>
+        <input id="cfgMaxUsePoints" type="number" min="0" step="1" value="100">
+      </div>
+      <div class="col">
+        <label>积分有效期（天，0=永不过期）</label>
+        <input id="cfgExpireDays" type="number" min="0" step="1" value="365">
+      </div>
+    </div>
+    <div class="hr"></div>
+    <h3>礼品清单</h3>
+    <div class="muted">JSON 数组，每项：{ "name":"礼品名", "points":所需分, "deductCash": 可选抵扣金额(元, 默认0) }</div>
+    <textarea id="cfgGifts">[
+  { "name": "小礼品A", "points": 50 },
+  { "name": "中杯咖啡", "points": 120, "deductCash": 10 },
+  { "name": "周边T恤", "points": 600 }
+]</textarea>
+    <div class="row" style="margin-top:8px">
+      <button id="btnSaveRule" class="ghost">保存规则</button>
+      <button id="btnRedeem" class="primary">读取并兑换礼品</button>
+      <select id="giftSelect"></select>
+      <span id="giftStatus" class="muted"></span>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>本机账本</h2>
+    <div class="muted">保存在 localStorage；请定期导出备份。更换设备请导入。</div>
+    <div class="row" style="margin-top:8px">
+      <button id="btnExport" class="ghost">导出账本JSON</button>
+      <button id="btnImport" class="ghost">导入账本JSON</button>
+      <button id="btnClear" class="ghost">清空账本（需密码）</button>
+      <span id="ledgerStatus" class="muted"></span>
+    </div>
+    <div class="hr"></div>
+    <label>账本预览</label>
+    <textarea id="ledgerView" readonly></textarea>
+  </div>
+
+  <div class="muted" style="margin-top:8px">
+    限制：本机信任模型；多人多终端需同步账本或接后端。卡片未做密码/签名防伪，无法阻止“他处伪造写卡”。如需提升安全，建议引入签名或后端校验。
+  </div>
+</div>
+
+<script>
+/* ========== 基础配置 ========== */
+const ADMIN_PASSWORD = "50c89cd7bda16185"; // 修改为你自己的
+const enc = new TextEncoder(), dec = new TextDecoder();
+
+/* ========== 卡片与工具函数 ========== */
+// 统一卡面：v,t(G|M),a,b,n,m
+function sanitizeCard(obj){
+  const t = (obj?.t==="G"||obj?.t==="M") ? obj.t : "M"; // 旧卡兼容
+  return {
+    v: 1,
+    t,
+    a: String(obj?.a || ""),
+    b: Number.isFinite(obj?.b) ? Math.max(0, Math.floor(obj.b)) : 0,
+    n: Number.isFinite(obj?.n) ? Math.max(0, Math.floor(obj.n)) : 0,
+    m: obj?.m ? 1 : 0
+  };
+}
+function parseCard(text){
+  try{
+    const o = JSON.parse(text);
+    if (!o || typeof o !== "object") return null;
+    const c = sanitizeCard(o);
+    if (!c.a) return null;
+    return c;
+  }catch{ return null; }
+}
+function uidShort(prefix="u"){
+  const a = crypto.getRandomValues(new Uint8Array(4));
+  return `${prefix}-${[...a].map(x=>x.toString(16).padStart(2,"0")).join("")}`;
+}
+
+/* ========== Web NFC ========== */
+function ensureNFC(){
+  if(!("NDEFReader" in window)) throw new Error("此浏览器不支持 Web NFC（请用 Android Chrome 并开启 NFC）");
+}
+async function nfcReadOnce(timeoutMs=30000){
+  ensureNFC();
+  const r = new NDEFReader();
+  await r.scan();
+  return new Promise((resolve, reject)=>{
+    const t = setTimeout(()=>reject(new Error("读取超时")), timeoutMs);
+    r.onreadingerror = ()=>{ clearTimeout(t); reject(new Error("读取失败")); };
+    r.onreading = ev=>{
+      clearTimeout(t);
+      try{
+        const { message } = ev;
+        for(const rec of message.records){
+          if(rec.recordType==="text" || rec.mediaType==="application/json"){
+            const text = rec.data ? dec.decode(rec.data) : "";
+            resolve(text);
+            return;
+          }
+        }
+        resolve("");
+      }catch(e){ reject(e); }
+    };
+  });
+}
+async function nfcWriteText(text){
+  ensureNFC();
+  if (new Blob([text]).size > 120) throw new Error("数据过大（超过 NTAG213 建议长度）");
+  const w = new NDEFReader();
+  await w.write({ records: [{ recordType: "text", data: text }] });
+}
+
+/* ========== 账本（本机） ========== */
+const LS_LEDGER = "card_suite_ledger_v1";
+const LS_RULES  = "card_suite_rules_v1";
+function loadLedger(){
+  try{ return JSON.parse(localStorage.getItem(LS_LEDGER)||"{}")||{}; }catch{ return {}; }
+}
+function saveLedger(o){ localStorage.setItem(LS_LEDGER, JSON.stringify(o)); }
+function setAcct(ledger, a, state){
+  ledger[a] = {
+    t: state.t||"M",
+    b: state.b|0, n: state.n|0, m: state.m?1:0,
+    tms: Date.now(),
+    pts: Number.isFinite(state.pts)? Math.max(0, Math.floor(state.pts)) : (ledger[a]?.pts|0)||0,
+    exp: Number.isFinite(state.exp)? state.exp|0 : (ledger[a]?.exp|0)||0
+  };
+}
+function getAcct(ledger, a){ return ledger[a] || null; }
+
+/* ========== 规则（积分与礼品） ========== */
+function defaultRules(){
+  return {
+    earnPerYuan: 1,
+    cashPerPoint: 0.1,
+    maxUsePoints: 100,
+    expireDays: 365,
+    gifts: [
+      { name: "小礼品A", points: 50 },
+      { name: "中杯咖啡", points: 120, deductCash: 10 },
+      { name: "周边T恤", points: 600 }
+    ]
+  };
+}
+function loadRules(){
+  try{
+    const r = JSON.parse(localStorage.getItem(LS_RULES)||"null");
+    const def = defaultRules();
+    if(!r || typeof r!=="object") return def;
+    return Object.assign(def, r, { gifts: Array.isArray(r.gifts)? r.gifts : def.gifts });
+  }catch{ return defaultRules(); }
+}
+function saveRules(r){ localStorage.setItem(LS_RULES, JSON.stringify(r)); }
+
+/* ========== 时间与回放检测 ========== */
+function now(){ return Date.now(); }
+function evaluateReplay(card, known){
+  if (!known) return { status:"unknown", message:"本机无记录（首次见）。" };
+  if (card.n < known.n || card.b < known.b) return { status:"suspicious", message:`疑似回放：卡(n=${card.n},b=${card.b}) < 本机(n=${known.n},b=${known.b})` };
+  if (card.n === known.n && card.b === known.b) return { status:"ok", message:"与本机记录一致。" };
+  return { status:"newer", message:"卡片较新，可能在他处更新。" };
+}
+
+/* ========== UI 绑定 ========== */
+const $ = id=>document.getElementById(id);
+const S = {
+  read: $("readStatus"), tag: $("tagJson"), hint: $("hint"),
+  topup: $("topupStatus"), spend: $("spendStatus"), force: $("btnForceSpend"),
+  ledStat: $("ledgerStatus"), ledView: $("ledgerView"),
+  giftSel: $("giftSelect"), giftStat: $("giftStatus")
+};
+function showJSON(target, obj){ target.value = typeof obj==="string" ? obj : JSON.stringify(obj,null,2); }
+function refreshLedgerView(){ S.ledView.value = JSON.stringify(loadLedger(), null, 2); }
+function syncGiftSelect(){
+  const r = loadRules();
+  S.giftSel.innerHTML = "";
+  r.gifts.forEach((g,i)=>{
+    const o = document.createElement("option");
+    o.value = String(i);
+    o.textContent = `${g.name}（需${g.points}分${g.deductCash?`，扣¥${g.deductCash}`:""}）`;
+    S.giftSel.appendChild(o);
+  });
+}
+
+/* ========== 管理员密码工具 ========== */
+async function requireAdminPassword(msg){
+  const ok = confirm(`${msg}\n此操作需要管理员密码，是否继续？`);
+  if(!ok) return false;
+  const v = prompt("请输入管理员密码：");
+  if (v===null) return false;
+  if (v!==ADMIN_PASSWORD){ alert("密码错误"); return false; }
+  return true;
+}
+
+/* ========== 积分工具 ========== */
+function ensurePointsFresh(acct, rules){
+  if (!acct) return;
+  if (!acct.exp) return;
+  if (rules.expireDays===0) return;
+  if (now() > acct.exp){ acct.pts = 0; acct.exp = 0; }
+}
+function awardPoints(acct, rules, amountYuan){
+  if (!acct.m) return;
+  const add = Math.floor(amountYuan * rules.earnPerYuan);
+  if (add<=0) return;
+  acct.pts = (acct.pts|0) + add;
+  acct.exp = rules.expireDays>0 ? now() + rules.expireDays*86400000 : 0;
+}
+function usePoints(acct, rules, wishUse){
+  if (!acct.m) return { usedPts:0, cashOff:0 };
+  ensurePointsFresh(acct, rules);
+  const usable = Math.min(acct.pts|0, rules.maxUsePoints|0, Math.max(0, Math.floor(wishUse)));
+  const cashOff = Number((usable * rules.cashPerPoint).toFixed(2));
+  acct.pts -= usable;
+  return { usedPts: usable, cashOff };
+}
+
+/* ========== 页面逻辑 ========== */
+window.addEventListener("load", ()=>{
+  // 初始化规则与礼品下拉
+  writeRulesToUI(loadRules());
+  syncGiftSelect();
+  refreshLedgerView();
+  updateUIByIssueType();
+
+  $("issueType").addEventListener("change", updateUIByIssueType);
+
+  // 读取
+  $("btnRead").addEventListener("click", async ()=>{
+    S.read.textContent = "请贴近标签读取...";
+    S.hint.textContent = "";
+    S.read.className = "muted";
+    try{
+      const text = await nfcReadOnce();
+      if(!text){ S.read.textContent = "读取完成：无文本记录"; S.tag.value=""; return; }
+      const card = parseCard(text);
+      if(!card){ S.read.textContent = "读取完成：非本系统卡格式"; S.read.className="err"; S.tag.value=text; return; }
+      const ledger = loadLedger();
+      const known = getAcct(ledger, card.a);
+      const ev = evaluateReplay(card, known);
+      S.read.textContent = `类型=${card.t} 账户=${card.a} 余额=${card.b} 序号=${card.n} 会员=${card.m? "开":"关"}`;
+      S.read.className = ev.status==="suspicious"?"err":(ev.status==="ok"?"ok":"muted");
+      S.hint.textContent = ev.message + (card.t==="G" ? "（礼品卡：不支持充值与积分）" : "");
+      showJSON(S.tag, card);
+      if (!known){
+        // 首次登记到账本
+        setAcct(ledger, card.a, { ...card, pts: 0, exp: 0 });
+        saveLedger(ledger);
+        refreshLedgerView();
+      }
+    }catch(e){
+      S.read.textContent = "读取失败：" + e.message;
+      S.read.className = "err";
+    }
+  });
+
+  // 发卡
+  $("btnIssue").addEventListener("click", async ()=>{
+    try{
+      const t = $("issueType").value==="G" ? "G" : "M";
+      const bal = Math.max(0, Math.floor(Number($("initBalance").value||0)));
+      const acc = ($("initAccount").value||"").trim() || uidShort(t==="G"?"g":"m");
+      const m = t==="M" ? (Number($("initMember").value)==1 ? 1 : 0) : 0;
+      const data = sanitizeCard({ t, a:acc, b:bal, n:0, m });
+      const text = JSON.stringify(data);
+      if(!confirm(`将写入：\n类型=${data.t==="G"?"礼品卡":"储值会员卡"}\n账户=${data.a}\n余额=${data.b}\n会员=${data.m?"开启":"关闭"}\n确认发卡？`)) return;
+      await nfcWriteText(text);
+      // 登记到账本
+      const ledger = loadLedger();
+      setAcct(ledger, data.a, { ...data, pts: 0, exp: 0 });
+      saveLedger(ledger);
+      refreshLedgerView();
+      alert("发卡完成。");
+    }catch(e){ alert("发卡失败：" + e.message); }
+  });
+
+  // 充值（仅储值卡）
+  $("btnTopup").addEventListener("click", async ()=>{
+    S.topup.textContent = "请贴近要充值的标签...";
+    S.topup.className = "muted";
+    try{
+      const text = await nfcReadOnce();
+      const card = parseCard(text);
+      if(!card) throw new Error("非本系统卡格式");
+      if(card.t!=="M") throw new Error("礼品卡不可充值");
+      const amount = Math.max(1, Math.floor(Number($("topupAmount").value||0)));
+      if (amount<=0) throw new Error("金额无效");
+
+      const ledger = loadLedger();
+      const known = getAcct(ledger, card.a);
+      const ev = evaluateReplay(card, known);
+      if (ev.status==="suspicious"){
+        S.topup.textContent = "检测到回放/复制，已拦截。";
+        S.topup.className = "err";
+        return;
+      }
+      const newCard = sanitizeCard(card);
+      newCard.b += amount;
+      newCard.n += 1;
+
+      const confirmMsg = `账户 ${card.a}\n充值金额：¥${amount}\n充值后余额：¥${newCard.b}\n确认写入？`;
+      if(!confirm(confirmMsg)) { S.topup.textContent = "已取消"; return; }
+      await nfcWriteText(JSON.stringify(newCard));
+
+      setAcct(ledger, newCard.a, { ...newCard, pts: known?.pts||0, exp: known?.exp||0 });
+      saveLedger(ledger);
+      refreshLedgerView();
+      S.topup.textContent = "充值完成。";
+      S.topup.className = "ok";
+    }catch(e){
+      S.topup.textContent = "充值失败：" + e.message;
+      S.topup.className = "err";
+    }
+  });
+
+  // 扣款（免密）
+  $("btnSpend").addEventListener("click", async ()=>{
+    S.spend.textContent = "请贴近要扣款的标签...";
+    S.spend.className = "muted";
+    S.force.disabled = true;
+    try{
+      const text = await nfcReadOnce();
+      const card = parseCard(text);
+      if(!card) throw new Error("非本系统卡格式");
+
+      const amount = Math.max(1, Math.floor(Number($("spendAmount").value||0)));
+      if (amount<=0) throw new Error("金额无效");
+
+      const rules = loadRules();
+      const ledger = loadLedger();
+      const known = getAcct(ledger, card.a);
+      const ev = evaluateReplay(card, known);
+      if (ev.status==="suspicious"){
+        S.spend.textContent = "检测到回放/复制，已拦截。可使用“强制扣款”。";
+        S.spend.className = "err";
+        S.force.disabled = false;
+        window.__lastCard__ = card;
+        window.__lastAmount__ = amount;
+        return;
+      }
+
+      // 礼品卡不参与积分
+      let usePts = 0, cashOff = 0;
+      let acctShadow = known ? { ...known } : { t:card.t, b:card.b, n:card.n, m:card.m, pts:0, exp:0 };
+      const allowPoints = (card.t==="M" && card.m===1 && $("usePoints").checked);
+      if (allowPoints){
+        // 最大可按金额抵扣的分数
+        const maxByAmount = rules.cashPerPoint>0 ? Math.floor(amount / rules.cashPerPoint + 1e-6) : 0;
+        ensurePointsFresh(acctShadow, rules);
+        const wish = Math.min(maxByAmount, rules.maxUsePoints|0, acctShadow.pts|0);
+        const res = usePoints(acctShadow, rules, wish);
+        usePts = res.usedPts; cashOff = Math.min(amount, res.cashOff);
+      }
+
+      const pay = Math.max(0, Math.floor(amount - cashOff + 1e-6));
+      if (card.b < pay) throw new Error(`余额不足（需¥${pay}，卡余¥${card.b}）`);
+
+      const newCard = sanitizeCard(card);
+      newCard.b -= pay;
+      newCard.n += 1;
+
+      const earnBase = (card.t==="M" && card.m===1) ? (amount - cashOff) : 0;
+
+      const confirmMsg = `类型=${card.t==="G"?"礼品卡":"储值卡"} 账户=${card.a}
+原始金额：¥${amount}
+${allowPoints?`积分抵扣：${usePts} 分 -> -¥${cashOff.toFixed(2)}\n`:""}实付金额：¥${pay}
+扣后余额：¥${newCard.b}
+${(card.t==="M"&&card.m)?`（会员：将按实付金额 ¥${earnBase} 记分）`: "（不记分）"}
+确认写入？`;
+      if(!confirm(confirmMsg)) { S.spend.textContent = "已取消"; return; }
+
+      await nfcWriteText(JSON.stringify(newCard));
+
+      // 更新账本
+      const after = { ...newCard };
+      if (card.t==="M" && card.m===1){
+        const shadow = known ? { ...known } : { t:newCard.t, b:newCard.b, n:newCard.n, m:newCard.m, pts:0, exp:0 };
+        shadow.pts = acctShadow.pts; // 已减去使用的积分
+        awardPoints(shadow, rules, earnBase); // 累计新积分
+        setAcct(loadLedger(), newCard.a, { ...after, pts: shadow.pts, exp: shadow.exp });
+      }else{
+        setAcct(loadLedger(), newCard.a, { ...after, pts: known?.pts||0, exp: known?.exp||0 });
+      }
+      const led = loadLedger(); // 重新取是为确保一致性
+      saveLedger(led);
+      refreshLedgerView();
+
+      S.spend.textContent = "扣款完成。";
+      S.spend.className = "ok";
+    }catch(e){
+      S.spend.textContent = "扣款失败：" + e.message;
+      S.spend.className = "err";
+    }
+  });
+
+  // 强制扣款（需管理员密码）
+  $("btnForceSpend").addEventListener("click", async ()=>{
+    try{
+      if (!(await requireAdminPassword("将绕过回放拦截，继续扣款"))) return;
+      const card = window.__lastCard__;
+      const amount = window.__lastAmount__;
+      if (!card || !amount) { alert("无待处理的扣款请求"); return; }
+
+      const rules = loadRules();
+      const ledger = loadLedger();
+      const known = getAcct(ledger, card.a);
+
+      let usePts = 0, cashOff = 0;
+      let acctShadow = known ? { ...known } : { t:card.t, b:card.b, n:card.n, m:card.m, pts:0, exp:0 };
+      const allowPoints = (card.t==="M" && card.m===1 && $("usePoints").checked);
+      if (allowPoints){
+        const maxByAmount = rules.cashPerPoint>0 ? Math.floor(amount / rules.cashPerPoint + 1e-6) : 0;
+        ensurePointsFresh(acctShadow, rules);
+        const wish = Math.min(maxByAmount, rules.maxUsePoints|0, acctShadow.pts|0);
+        const res = usePoints(acctShadow, rules, wish);
+        usePts = res.usedPts; cashOff = Math.min(amount, res.cashOff);
+      }
+
+      const pay = Math.max(0, Math.floor(amount - cashOff + 1e-6));
+      if (card.b < pay) throw new Error(`余额不足（需¥${pay}，卡余¥${card.b}）`);
+
+      const newCard = sanitizeCard(card);
+      newCard.b -= pay;
+      newCard.n += 1;
+
+      const earnBase = (card.t==="M" && card.m===1) ? (amount - cashOff) : 0;
+
+      await nfcWriteText(JSON.stringify(newCard));
+
+      // 更新账本（与普通扣款一致）
+      if (card.t==="M" && card.m===1){
+        const shadow = known ? { ...known } : { t:newCard.t, b:newCard.b, n:newCard.n, m:newCard.m, pts:0, exp:0 };
+        shadow.pts = acctShadow.pts;
+        awardPoints(shadow, rules, earnBase);
+        setAcct(ledger, newCard.a, { ...newCard, pts: shadow.pts, exp: shadow.exp });
+      }else{
+        setAcct(ledger, newCard.a, { ...newCard, pts: known?.pts||0, exp: known?.exp||0 });
+      }
+      saveLedger(ledger);
+      refreshLedgerView();
+
+      S.spend.textContent = "已强制扣款并更新。";
+      S.spend.className = "ok";
+      S.force.disabled = true;
+      window.__lastCard__ = null;
+      window.__lastAmount__ = null;
+    }catch(e){
+      S.spend.textContent = "强制扣款失败：" + e.message;
+      S.spend.className = "err";
+    }
+  });
+
+  // 兑换礼品（仅储值会员卡生效）
+  $("btnRedeem").addEventListener("click", async ()=>{
+    S.giftStat.textContent = "请贴近要兑换的标签...";
+    S.giftStat.className = "muted";
+    try{
+      const text = await nfcReadOnce();
+      const card = parseCard(text);
+      if(!card) throw new Error("非本系统卡格式");
+      if(card.t!=="M" || card.m!==1) throw new Error("仅对开启会员的储值卡可用");
+
+      const r = loadRules();
+      const gifts = r.gifts || [];
+      const idx = Math.max(0, Math.floor(Number(S.giftSel.value||0)));
+      const g = gifts[idx];
+      if (!g) throw new Error("礼品不存在");
+
+      const ledger = loadLedger();
+      const known = getAcct(ledger, card.a);
+      if (!known) throw new Error("账本无此账户，请先在本机读取一次该卡以登记");
+
+      ensurePointsFresh(known, r);
+      if ((known.pts|0) < (g.points|0)) throw new Error(`积分不足（需 ${g.points} 分，现有 ${known.pts|0} 分）`);
+
+      // 处理抵扣金额（若设置）
+      const deduct = Math.max(0, Number(g.deductCash||0));
+      let newCard = sanitizeCard(card);
+      if (deduct>0){
+        if (newCard.b < deduct) throw new Error(`余额不足以支付礼品扣款（需¥${deduct}，卡余¥${newCard.b}）`);
+        newCard.b -= Math.floor(deduct);
+      }
+      newCard.n += 1;
+
+      const msg = `兑换：${g.name}
+消耗积分：${g.points} 分
+${deduct>0?`礼品需扣余额：¥${deduct}\n`:""}扣后余额：¥${newCard.b}
+确认写入？`;
+      if(!confirm(msg)) { S.giftStat.textContent = "已取消"; return; }
+
+      await nfcWriteText(JSON.stringify(newCard));
+
+      known.pts -= g.points;
+      setAcct(ledger, newCard.a, { ...newCard, pts: Math.max(0, known.pts|0), exp: known.exp||0 });
+      saveLedger(ledger);
+      refreshLedgerView();
+
+      S.giftStat.textContent = "兑换完成。";
+      S.giftStat.className = "ok";
+    }catch(e){
+      S.giftStat.textContent = "兑换失败：" + e.message;
+      S.giftStat.className = "err";
+    }
+  });
+
+  // 保存规则
+  $("btnSaveRule").addEventListener("click", ()=>{
+    try{
+      const r = readRulesFromUI();
+      saveRules(r);
+      syncGiftSelect();
+      alert("已保存规则");
+    }catch(e){ alert("保存失败：" + e.message); }
+  });
+
+  // 导出账本
+  $("btnExport").addEventListener("click", ()=>{
+    try{
+      const data = JSON.stringify(loadLedger(), null, 2);
+      const blob = new Blob([data], {type:"application/json"});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = `ledger-${new Date().toISOString().slice(0,10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      S.ledStat.textContent = "已导出账本。";
+      S.ledStat.className = "ok";
+    }catch(e){
+      S.ledStat.textContent = "导出失败：" + e.message;
+      S.ledStat.className = "err";
+    }
+  });
+
+  // 导入账本
+  $("btnImport").addEventListener("click", async ()=>{
+    try{
+      // 可选加密码；这里不强制密码，若你需要也可加和清空一致的流程
+      const inp = document.createElement("input");
+      inp.type = "file"; inp.accept = "application/json";
+      inp.onchange = ()=>{
+        const f = inp.files[0];
+        if(!f) return;
+        const fr = new FileReader();
+        fr.onload = ()=>{
+          try{
+            const obj = JSON.parse(fr.result);
+            if (!obj || typeof obj!=="object") throw new Error("文件不是有效的账本JSON");
+            // 合并（同名账户覆盖）
+            const old = loadLedger();
+            const merged = Object.assign({}, old, obj);
+            saveLedger(merged);
+            refreshLedgerView();
+            S.ledStat.textContent = "已导入账本（同名账户已覆盖）。";
+            S.ledStat.className = "ok";
+          }catch(e){
+            S.ledStat.textContent = "导入失败：" + e.message;
+            S.ledStat.className = "err";
+          }
+        };
+        fr.readAsText(f);
+      };
+      inp.click();
+    }catch(e){
+      S.ledStat.textContent = "导入失败：" + e.message;
+      S.ledStat.className = "err";
+    }
+  });
+
+  // 清空账本（需要管理员密码）
+  $("btnClear").addEventListener("click", async ()=>{
+    if (!confirm("此操作将删除本机账本，且不可恢复。是否继续？")) return;
+    const ok = await requireAdminPassword("清空本机账本");
+    if (!ok) { S.ledStat.textContent = "已取消"; S.ledStat.className = "muted"; return; }
+    try{
+      localStorage.removeItem(LS_LEDGER);
+      S.ledStat.textContent = "已清空本机账本。";
+      S.ledStat.className = "ok";
+      refreshLedgerView();
+    }catch(e){
+      S.ledStat.textContent = "清空失败：" + e.message;
+      S.ledStat.className = "err";
+    }
+  });
+});
+
+/* ========== 规则UI读写 ========== */
+function readRulesFromUI(){
+  const earnPerYuan = Math.max(0, Number($("cfgEarnPerYuan").value||0));
+  const cashPerPoint = Math.max(0, Number($("cfgCashPerPoint").value||0));
+  const maxUsePoints = Math.max(0, Math.floor(Number($("cfgMaxUsePoints").value||0)));
+  const expireDays   = Math.max(0, Math.floor(Number($("cfgExpireDays").value||0)));
+  let gifts;
+  try{
+    gifts = JSON.parse($("cfgGifts").value||"[]");
+    if(!Array.isArray(gifts)) throw new Error("礼品列表需为数组");
+    gifts.forEach(g=>{
+      if(typeof g.name!=="string"||!g.name) throw new Error("礼品项缺少名称");
+      g.points = Math.max(0, Math.floor(Number(g.points||0)));
+      if (g.deductCash!=null) g.deductCash = Math.max(0, Number(g.deductCash));
+    });
+  }catch(e){ throw e; }
+  return { earnPerYuan, cashPerPoint, maxUsePoints, expireDays, gifts };
+}
+function writeRulesToUI(r){
+  $("cfgEarnPerYuan").value = r.earnPerYuan;
+  $("cfgCashPerPoint").value = r.cashPerPoint;
+  $("cfgMaxUsePoints").value = r.maxUsePoints;
+  $("cfgExpireDays").value = r.expireDays;
+  $("cfgGifts").value = JSON.stringify(r.gifts, null, 2);
+}
+
+/* ========== 根据发卡类型调整UI可用性 ========== */
+function updateUIByIssueType(){
+  const type = $("issueType").value;
+  const isGift = type==="G";
+  // 发卡时 m 对礼品卡无效，但仍显示说明
+  $("initMember").disabled = isGift;
+  // 充值区在礼品卡模式下置灰提示（读取实际卡片时仍做强校验）
+  $("btnTopup").disabled = isGift;
+  $("topupAmount").disabled = isGift;
+  $("topupNote").disabled = isGift;
+  // 扣款区：积分复选在礼品卡模式下禁用
+  $("usePoints").disabled = isGift;
+}
+</script>
+</body>
+</html>
