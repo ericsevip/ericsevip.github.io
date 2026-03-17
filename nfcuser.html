@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+<title>NFC卡查询 - 余额/卡号查看</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;font-family:system-ui,-apple-system,Segoe UI,Roboto,PingFang SC,Noto Sans SC,Arial,sans-serif;}
+  body{background:#f5f7fa;padding:20px;}
+  .card{max-width:400px;margin:0 auto;background:#fff;border-radius:20px;box-shadow:0 4px 12px rgba(0,0,0,0.08);padding:30px;}
+  h1{font-size:1.6rem;text-align:center;color:#333;margin-bottom:30px;font-weight:600;}
+  .read-btn{width:100%;padding:16px;background:#2563eb;color:#fff;border:none;border-radius:12px;font-size:1.1rem;font-weight:500;cursor:pointer;margin-bottom:30px;}
+  .read-btn:active{background:#1d4ed8;}
+  .result-box{border:1px solid #e2e8f0;border-radius:12px;padding:20px;}
+  .result-item{display:flex;justify-content:space-between;margin:12px 0;font-size:1rem;}
+  .label{color:#64748b;font-weight:500;}
+  .value{color:#1e293b;font-weight:600;}
+  .status{text-align:center;margin-top:20px;font-size:0.95rem;color:#94a3b8;}
+  .err{color:#ef4444;}
+  .ok{color:#22c55e;}
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>NFC卡余额查询</h1>
+    <button class="read-btn" id="btnReadCard">点击读卡 → 查看卡号/余额</button>
+    <div class="result-box">
+      <div class="result-item">
+        <span class="label">卡号：</span>
+        <span class="value" id="cardNo">未读取</span>
+      </div>
+      <div class="result-item">
+        <span class="label">当前余额：</span>
+        <span class="value" id="cardBalance">未读取</span>
+      </div>
+    </div>
+    <div class="status" id="readStatus">请点击按钮，贴近NFC卡片查询</div>
+  </div>
+
+<script>
+// 编解码工具（和商户版一致，保证兼容）
+const dec = new TextDecoder();
+// DOM元素绑定
+const $ = id => document.getElementById(id);
+const btnRead = $("btnReadCard");
+const cardNo = $("cardNo");
+const cardBalance = $("cardBalance");
+const readStatus = $("readStatus");
+
+// 检查NFC支持
+function checkNFC() {
+  if (!("NDEFReader" in window)) {
+    readStatus.className = "status err";
+    readStatus.textContent = "此设备/浏览器不支持NFC（请用Android Chrome）";
+    btnRead.disabled = true;
+    btnRead.style.opacity = "0.6";
+    return false;
+  }
+  return true;
+}
+
+// 解析卡片数据（适配商户版格式）
+function parseCardData(text) {
+  try {
+    const obj = JSON.parse(text);
+    // 验证是否为商户版标准格式
+    if (obj.v === 1 && obj.a && typeof obj.b === "number") {
+      return {
+        a: obj.a, // 卡号
+        b: obj.b  // 余额
+      };
+    }
+    return null;
+  } catch (e) {
+    return null;
+  }
+}
+
+// 读取NFC卡片核心方法
+async function readNFC() {
+  if (!checkNFC()) return;
+  // 重置状态
+  cardNo.textContent = "读取中...";
+  cardBalance.textContent = "读取中...";
+  readStatus.className = "status";
+  readStatus.textContent = "请贴近NFC卡片，请勿移开...";
+  btnRead.disabled = true;
+  btnRead.style.opacity = "0.6";
+
+  try {
+    const reader = new NDEFReader();
+    await reader.scan();
+    const message = await new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => reject(new Error("读卡超时")), 30000);
+      reader.onreading = (ev) => {
+        clearTimeout(timeout);
+        resolve(ev.message);
+      };
+      reader.onreadingerror = () => {
+        clearTimeout(timeout);
+        reject(new Error("读卡失败"));
+      };
+    });
+
+    // 解析卡片文本数据
+    let cardText = "";
+    for (const rec of message.records) {
+      if (rec.recordType === "text" || rec.mediaType === "application/json") {
+        cardText = rec.data ? dec.decode(rec.data) : "";
+        break;
+      }
+    }
+
+    // 解析并显示卡号/余额
+    const cardData = parseCardData(cardText);
+    if (cardData) {
+      cardNo.textContent = cardData.a;
+      cardBalance.textContent = cardData.b + " 元";
+      readStatus.className = "status ok";
+      readStatus.textContent = "读卡成功！";
+    } else {
+      throw new Error("非本系统NFC卡，无法识别");
+    }
+
+  } catch (e) {
+    // 异常处理
+    cardNo.textContent = "未读取";
+    cardBalance.textContent = "未读取";
+    readStatus.className = "status err";
+    readStatus.textContent = "错误：" + e.message;
+  } finally {
+    // 恢复按钮
+    btnRead.disabled = false;
+    btnRead.style.opacity = "1";
+  }
+}
+
+// 绑定点击事件
+btnRead.addEventListener("click", readNFC);
+// 页面加载检查NFC
+window.onload = checkNFC;
+</script>
+</body>
+</html>
