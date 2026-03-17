@@ -29,7 +29,7 @@
   <h1>NFC 商户版（NTAG213 + 本机账本防复制）</h1>
   <div class="muted">
     - 卡面格式：{"v":1,"a":"账号","b":余额,"n":序号}（极简，适配 NTAG213）<br>
-    - 本机 localStorage 记录每个账户的最新余额与序号，检测复制/回放。<br>
+    - 本机 localStorage 记录每个账户的最新余额与序号，检测复制/回放/伪造卡。<br>
     - 常规扣款/充值/发卡免密，仅强制扣款/强制充值需管理员密码。<br>
     - 管理员密码：50c89cd7bda16185（可在代码顶部修改）。<br>
     - 建议 Android Chrome + HTTPS 或 localhost。<br>
@@ -78,7 +78,7 @@
     </div>
     <div class="row" style="margin-top:8px">
       <button id="btnSpend" class="primary">读取并扣款（免密）</button>
-      <button id="btnForceSpend" class="ghost" title="当被判定为回放/复制时可用" disabled>强制扣款（需密码）</button>
+      <button id="btnForceSpend" class="ghost" title="当被判定为破解/伪造/复制卡时可用" disabled>强制扣款（需密码）</button>
       <span id="spendStatus" class="muted"></span>
     </div>
   </div>
@@ -97,7 +97,7 @@
     </div>
     <div class="row" style="margin-top:8px">
       <button id="btnRecharge" class="primary">读取并充值（免密）</button>
-      <button id="btnForceRecharge" class="ghost" title="当被判定为回放/复制时可用" disabled>强制充值（需密码）</button>
+      <button id="btnForceRecharge" class="ghost" title="当被判定为破解/伪造/复制卡时可用" disabled>强制充值（需密码）</button>
       <span id="rechargeStatus" class="muted"></span>
     </div>
   </div>
@@ -106,7 +106,7 @@
     <h2>本机账本</h2>
     <div class="muted">
       - 保存在浏览器 localStorage，仅本设备本浏览器可见。<br>
-      - 清空账本不会影响卡片，但会失去防回放能力。<br>
+      - 清空账本不会影响卡片，但会失去防回放/伪造能力。<br>
     </div>
     <div class="row" style="margin-top:8px">
       <button id="btnExport" class="ghost">导出账本JSON</button>
@@ -229,25 +229,25 @@ async function requireAdminPassword(purpose){
   if (input !== ADMIN_PASSWORD) { alert("管理员密码错误"); return false; }
   return true;
 }
-/* 复制/回放检测逻辑 */
+/* 复制/回放/伪造卡检测逻辑 - 核心修改：unknown状态归为异常 */
 function evaluateReplay(card, known){
-  // 返回 {status: "ok" | "suspicious" | "newer" | "unknown", message}
+  // 返回 {status: "ok" | "suspicious" | "newer", message} 移除unknown，无记录直接归为suspicious
   if (!known) {
-    return { status: "unknown", message: "本机无该账户记录（首次见）。" };
+    return { status: "suspicious", message: "检测到未知账户，疑似破解/伪造卡。" };
   }
   if (card.n < known.n || card.b < known.b) {
-    return { status: "suspicious", message: `疑似回放/复制：卡(n=${card.n},b=${card.b}) < 本机(n=${known.n},b=${known.b})。` };
+    return { status: "suspicious", message: `疑似复制/回放卡：卡(n=${card.n},b=${card.b}) < 本机(n=${known.n},b=${known.b})。` };
   }
   if (card.n === known.n && card.b === known.b) {
-    return { status: "ok", message: "与本机记录一致。" };
+    return { status: "ok", message: "与本机记录一致，为正常卡。" };
   }
   // 其余视为“卡更新更近”（可能他处充值/扣款）
-  return { status: "newer", message: `卡片较新：卡(n=${card.n},b=${card.b}) ≥ 本机(n=${known.n},b=${known.b})。` };
+  return { status: "newer", message: `卡片较新：卡(n=${card.n},b=${card.b}) ≥ 本机(n=${known.n},b=${known.b})，已同步账本。` };
 }
 /* 事件 */
 window.addEventListener("load", ()=>{
   refreshLedgerView();
-  // 读取标签：原版无修改
+  // 读取标签：适配新的检测逻辑
   $("btnRead").addEventListener("click", async ()=>{
     S.read.textContent = "请贴近标签读取...";
     S.read.className = "muted";
@@ -269,6 +269,7 @@ window.addEventListener("load", ()=>{
       S.read.className = evalRes.status === "suspicious" ? "err" : (evalRes.status === "ok" ? "ok" : "muted");
       S.hint.textContent = evalRes.message;
       showJSON(S.tagJson, card);
+      // 无记录时也写入账本（仅标记，仍需强制操作）
       if (!known) {
         setAcct(ledger, card.a, card);
         saveLedger(ledger);
@@ -298,7 +299,7 @@ window.addEventListener("load", ()=>{
       alert("初始化失败：" + e.message);
     }
   });
-  // 常规扣款（移除密码验证，免密）
+  // 常规扣款（移除密码验证，免密）- 核心修改：suspicious直接触发强制
   $("btnSpend").addEventListener("click", async ()=>{
     S.spend.textContent = "请贴近要扣款的标签...";
     S.spend.className = "muted";
@@ -311,8 +312,9 @@ window.addEventListener("load", ()=>{
       const ledger = loadLedger();
       const known = getAcct(ledger, card.a);
       const evalRes = evaluateReplay(card, known);
+      // 异常状态（含无记录/破解/复制）直接触发强制扣款
       if (evalRes.status === "suspicious") {
-        S.spend.textContent = "检测到回放/复制，已阻止扣款。可点“强制扣款”继续。";
+        S.spend.textContent = "检测到未知账户，疑似破解/伪造卡，可点强制扣款继续。";
         S.spend.className = "err";
         S.btnForceSpend.disabled = false;
         window.__lastCard__ = card;
@@ -347,7 +349,7 @@ window.addEventListener("load", ()=>{
     const card = window.__lastCard__;
     if (!card) { alert("无待处理的卡片数据，请先读取卡。"); return; }
     try{
-      const ok = await requireAdminPassword("强制扣款风险自担，请再次输入管理员密码");
+      const ok = await requireAdminPassword("强制扣款风险自担，疑似破解/伪造卡，确认继续？");
       if(!ok) return;
       const amount = Math.max(1, Math.floor(Number($("spendAmount").value || 0)));
       if (card.b < amount) { alert("余额不足，无法强制扣款"); return; }
@@ -356,7 +358,7 @@ window.addEventListener("load", ()=>{
       newCard.b -= amount;
       newCard.n += 1;
       const out = JSON.stringify(newCard);
-      if (!confirm(`【强制扣款】账户 ${card.a}\n本次扣款：${amount}\n扣后余额：${newCard.b}\n${note ? "备注：" + note + "\n" : ""}确认写入？`)) return;
+      if (!confirm(`【强制扣款】疑似破解/伪造卡\n账户 ${card.a}\n本次扣款：${amount}\n扣后余额：${newCard.b}\n${note ? "备注：" + note + "\n" : ""}确认写入？`)) return;
       await nfcWriteText(out);
       const ledger = loadLedger();
       setAcct(ledger, newCard.a, newCard);
@@ -372,7 +374,7 @@ window.addEventListener("load", ()=>{
       alert("强制扣款失败：" + e.message);
     }
   });
-  // 常规充值（移除密码验证，免密）
+  // 常规充值（移除密码验证，免密）- 核心修改：suspicious直接触发强制
   $("btnRecharge").addEventListener("click", async ()=>{
     S.recharge.textContent = "请贴近要充值的标签...";
     S.recharge.className = "muted";
@@ -385,8 +387,9 @@ window.addEventListener("load", ()=>{
       const ledger = loadLedger();
       const known = getAcct(ledger, card.a);
       const evalRes = evaluateReplay(card, known);
+      // 异常状态（含无记录/破解/复制）直接触发强制充值
       if (evalRes.status === "suspicious") {
-        S.recharge.textContent = "检测到回放/复制，已阻止充值。可点“强制充值”继续。";
+        S.recharge.textContent = "检测到未知账户，疑似破解/伪造卡，可点强制充值继续。";
         S.recharge.className = "err";
         S.btnForceRecharge.disabled = false;
         window.__lastCard__ = card;
@@ -420,7 +423,7 @@ window.addEventListener("load", ()=>{
     const card = window.__lastCard__;
     if (!card) { alert("无待处理的卡片数据，请先读取卡。"); return; }
     try{
-      const ok = await requireAdminPassword("强制充值风险自担，请再次输入管理员密码");
+      const ok = await requireAdminPassword("强制充值风险自担，疑似破解/伪造卡，确认继续？");
       if(!ok) return;
       const amount = Math.max(1, Math.floor(Number($("rechargeAmount").value || 0)));
       const note = ($("rechargeNote").value || "").trim();
@@ -428,7 +431,7 @@ window.addEventListener("load", ()=>{
       newCard.b += amount;
       newCard.n += 1;
       const out = JSON.stringify(newCard);
-      if (!confirm(`【强制充值】账户 ${card.a}\n本次充值：${amount}\n充后余额：${newCard.b}\n${note ? "备注：" + note + "\n" : ""}确认写入？`)) return;
+      if (!confirm(`【强制充值】疑似破解/伪造卡\n账户 ${card.a}\n本次充值：${amount}\n充后余额：${newCard.b}\n${note ? "备注：" + note + "\n" : ""}确认写入？`)) return;
       await nfcWriteText(out);
       const ledger = loadLedger();
       setAcct(ledger, newCard.a, newCard);
