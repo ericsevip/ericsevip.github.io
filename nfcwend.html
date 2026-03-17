@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>會員/禮品卡 一體版（含對帳修復與密碼保護）</title>
+<style>
+  :root { --ok:#0a7c4a; --err:#c0392b; --warn:#b9770e; --muted:#7f8c8d; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans TC", Arial, "PingFang TC", "Heiti TC", sans-serif; margin: 0; padding: 16px; background:#fafafa; color:#222;}
+  h1 { font-size: 20px; margin: 0 0 12px; }
+  .row { display:flex; flex-wrap: wrap; gap:12px; }
+  .card { background:#fff; border:1px solid #e5e7eb; border-radius:10px; padding:12px; flex:1 1 320px; }
+  label { display:block; font-size:13px; color:#555; margin-top:8px; }
+  input, select, textarea, button { font: inherit; }
+  input[type="number"], input[type="text"], select, textarea {
+    width:100%; box-sizing: border-box; padding:8px; border:1px solid #d1d5db; border-radius:8px; background:#fff;
+  }
+  textarea { min-height: 120px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace; }
+  .btn { padding:8px 12px; border-radius:8px; border:1px solid #d1d5db; background:#111827; color:#fff; cursor:pointer; }
+  .btn.ghost { background:#fff; color:#111; }
+  .btn.warn { background: #b9770e; border-color:#b9770e; }
+  .btn.danger { background:#c0392b; border-color:#c0392b; }
+  .muted { color: var(--muted); }
+  .ok { color: var(--ok); }
+  .err { color: var(--err); }
+  .warnText { color: var(--warn); }
+  .hl { font-weight:600; }
+  .grid2 { display:grid; grid-template-columns: 1fr 1fr; gap:8px; }
+  @media (max-width: 640px) { .grid2 { grid-template-columns: 1fr; } }
+  .kvs { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; background:#0b1020; color:#eee; padding:8px; border-radius:8px; overflow:auto; max-height:200px;}
+</style>
+</head>
+<body>
+  <h1>會員/禮品卡 一體版</h1>
+  <div id="appStat" class="muted">就緒。</div>
+
+  <div class="row" style="margin-top:12px;">
+    <div class="card" style="max-width:420px;">
+      <div class="grid2">
+        <div>
+          <label>卡類型</label>
+          <select id="cardType">
+            <option value="M">儲值會員卡 (可充值/積分)</option>
+            <option value="G">禮品卡 (不可充值/無積分)</option>
+          </select>
+        </div>
+        <div>
+          <label>會員功能</label>
+          <select id="memberSwitch">
+            <option value="1">開啟</option>
+            <option value="0">關閉</option>
+          </select>
+          <div class="muted" style="font-size:12px;">僅對儲值卡有意義；禮品卡固定無積分。</div>
+        </div>
+      </div>
+
+      <label>發卡/充值 初始或充值金額（元，整數）</label>
+      <input id="initAmount" type="number" step="1" min="0" value="100" />
+      <div class="grid2" style="margin-top:8px;">
+        <button id="btnIssue" class="btn">發新卡 / 覆寫卡</button>
+        <button id="btnRecharge" class="btn ghost">充值（僅儲值卡）</button>
+      </div>
+      <div id="issueStat" class="muted" style="margin-top:6px;"></div>
+    </div>
+
+    <div class="card" style="max-width:420px;">
+      <label>扣款金額（元，整數）</label>
+      <input id="spendAmount" type="number" step="1" min="0" value="20" />
+      <label>使用積分抵扣（儲值卡且會員開啟時可用）</label>
+      <select id="usePoints">
+        <option value="0">不使用</option>
+        <option value="1">使用</option>
+      </select>
+      <div class="grid2" style="margin-top:8px;">
+        <button id="btnSpend" class="btn">正常扣款</button>
+        <button id="btnForceSpend" class="btn warn">強制扣款（需密碼）</button>
+      </div>
+      <div id="spendStat" class="muted" style="margin-top:6px;"></div>
+      <div style="font-size:12px; margin-top:4px;" class="muted">若提示“卡片比本機新”，請先點“對帳/修復帳本”。</div>
+    </div>
+
+    <div class="card" style="max-width:420px;">
+      <div class="grid2">
+        <button id="btnRead" class="btn ghost">讀卡</button>
+        <button id="btnReconcile" class="btn ghost">對帳/修復帳本</button>
+      </div>
+      <div id="readStat" class="muted" style="margin-top:6px;"></div>
+      <label style="margin-top:8px;">卡片數據</label>
+      <textarea id="cardView" spellcheck="false" readonly></textarea>
+    </div>
+  </div>
+
+  <div class="row" style="margin-top:12px;">
+    <div class="card">
+      <h3 style="margin:4px 0 8px;">本機帳本</h3>
+      <div class="grid2">
+        <button id="btnExport" class="btn ghost">導出帳本</button>
+        <button id="btnImport" class="btn ghost">導入帳本（需密碼）</button>
+        <button id="btnClear" class="btn danger">清空帳本（需密碼）</button>
+      </div>
+      <div id="ledgerStat" class="muted" style="margin-top:6px;"></div>
+      <pre id="ledgerView" class="kvs"></pre>
+    </div>
+
+    <div class="card">
+      <h3 style="margin:4px 0 8px;">規則與提示</h3>
+      <div class="muted" style="font-size:14px; line-height:1.5;">
+        <div>卡面字段：v=1，t=G/M，a=帳戶ID，b=餘額(元)，n=序號(防回放)，m=會員開關(0/1)。舊卡無 t 視為 M。</div>
+        <div>積分規則：本示例按“實付金額”每 1 元記 1 分，100 分可抵 1 元（可自行修改 awardPoints、calcCashOff）。</div>
+        <div>禮品卡：不可充值、無積分；UI已自動屏蔽充值與積分抵扣。</div>
+        <div>強制扣款：需要管理員密碼；請優先使用“對帳/修復帳本”。</div>
+      </div>
+      <pre class="kvs" id="tips"></pre>
+    </div>
+  </div>
+
+<script>
+/*** 基本常量與輔助 ***/
+const ADMIN_PASSWORD = "114514";                // 請修改
+const LS_LEDGER = "card_ledger_v1";
+const LS_RULES = "card_rules_v1";
+const LS_PENDING = "pending_reconcile_v1";
+
+const $ = (id)=>document.getElementById(id);
+const S = {
+  app: $("appStat"),
+  issue: $("issueStat"),
+  read: $("readStat"),
+  spend: $("spendStat"),
+  led: $("ledgerStat"),
+  cardView: $("cardView"),
+  ledgerView: $("ledgerView"),
+  tips: $("tips"),
+};
+
+function nowISO(){ return new Date().toISOString(); }
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+/*** 模擬/占位 NFC API（請替換為你實際 nfcReadOnce/nfcWriteText） ***/
+// 這裡提供一個可運行的本地模擬（使用 textarea 當作“卡”），方便你先驗證流程。
+// 真機上請替換成實際的 Web NFC 調用。
+async function nfcReadOnce(){
+  // 在真機：const ndef = new NDEFReader(); await ndef.scan(); 監聽 message 取 text
+  const text = S.cardView.value.trim();
+  if (!text) throw new Error("卡片無數據（模擬環境）");
+  return text;
+}
+async function nfcWriteText(text){
+  // 在真機：const ndef = new NDEFReader(); await ndef.write({records:[{recordType:"text", data:text}]})
+  S.cardView.value = text; // 模擬：直接覆寫 textarea
+  await sleep(50);
+}
+
+/*** 數據結構與校驗 ***/
+function newAccountId(){ return "A" + Math.random().toString(36).slice(2,8).toUpperCase(); }
+
+function parseCard(text){
+  try{
+    const o = JSON.parse(text);
+    if (typeof o !== "object" || o===null) return null;
+    const v = Number(o.v||1);
+    const t = o.t || "M";
+    const a = String(o.a||"").trim();
+    const b = Number.isInteger(o.b) ? o.b : NaN;
+    const n = Number.isInteger(o.n) ? o.n : NaN;
+    const m = Number.isInteger(o.m) ? o.m : 0;
+    if (!a || !Number.isInteger(b) || !Number.isInteger(n)) return null;
+    return { v, t, a, b, n, m: t==="G" ? 0 : (m?1:0) };
+  }catch{ return null; }
+}
+
+/*** 帳本存取 ***/
+function loadLedger(){
+  try { return JSON.parse(localStorage.getItem(LS_LEDGER) || '{"_meta":{"ver":1,"updated":""},"accts":{}}'); }
+  catch { return {"_meta":{"ver":1,"updated":""},"accts":{}}; }
+}
+function saveLedger(ledger){
+  ledger._meta = ledger._meta || {};
+  ledger._meta.updated = nowISO();
+  localStorage.setItem(LS_LEDGER, JSON.stringify(ledger));
+}
+function getAcct(ledger, a){ return ledger.accts?.[a] || null; }
+function setAcct(ledger, a, val){
+  ledger.accts = ledger.accts || {};
+  ledger.accts[a] = val;
+}
+function refreshLedgerView(){
+  const ledger = loadLedger();
+  S.ledgerView.textContent = JSON.stringify(ledger, null, 2);
+}
+
+/*** 規則與積分 ***/
+function loadRules(){
+  try { return JSON.parse(localStorage.getItem(LS_RULES) || '{"earnPerYuan":1,"yuanPer100Pts":1}'); }
+  catch { return {"earnPerYuan":1,"yuanPer100Pts":1}; }
+}
+// 按實付金額每 1 元 記 1 分
+function awardPoints(acct, rules, payYuan){
+  const earn = Math.max(0, Math.floor((payYuan||0) * (rules.earnPerYuan||1)));
+  acct.pts = (acct.pts||0) + earn;
+  return earn;
+}
+// 100 分抵 1 元，向下取整
+function calcCashOff(acct, rules, intendedYuan){
+  const pts = acct?.pts|0;
+  const yuanPer100 = rules.yuanPer100Pts||1;
+  const maxOff = Math.floor(pts / 100) * yuanPer100;
+  return Math.min(maxOff, Math.max(0, intendedYuan|0));
+}
+
+/*** 回放/新舊判斷 ***/
+function evaluateReplay(card, known){
+  if (!known) return { status:"ok", reason:"first" };
+  // n: 序號遞增；b: 餘額按操作改變
+  if (card.n > (known.n|0)) return { status:"newer" };
+  if (card.n === (known.n|0) && card.b === (known.b|0)) return { status:"ok" };
+  if (card.n < (known.n|0)) return { status:"suspicious", reason:"older_seq" };
+  // 同號不同餘額 → 可疑
+  return { status:"suspicious", reason:"same_seq_diff" };
+}
+
+/*** UI 輔助 ***/
+function uiForType(t){
+  // 禮品卡禁用會員與充值、积分抵扣
+  if (t === "G") {
+    $("memberSwitch").value = "0";
+    $("memberSwitch").disabled = true;
+    $("btnRecharge").disabled = true;
+    $("usePoints").value = "0";
+    $("usePoints").disabled = true;
+  } else {
+    $("memberSwitch").disabled = false;
+    $("btnRecharge").disabled = false;
+    $("usePoints").disabled = false;
+  }
+}
+
+/*** 初始化 ***/
+window.addEventListener("load", ()=>{
+  uiForType($("cardType").value);
+  $("cardType").addEventListener("change", (e)=> uiForType(e.target.value));
+
+  // 待對帳提示
+  try{
+    const pend = JSON.parse(localStorage.getItem(LS_PENDING)||"null");
+    if (pend?.a) {
+      S.app.textContent = `檢測到待對帳：帳戶 ${pend.a}，請點“對帳/修復帳本”並貼同一張卡完成同步。`;
+      S.app.className = "warnText";
+    }
+  }catch{}
+
+  refreshLedgerView();
+  S.tips.textContent =
+`常見操作建議：
+- 先“讀卡”檢視卡面，確認 t=卡類型、a=帳戶、b=餘額、n=序號、m=會員。
+- 正常扣款會先寫卡成功，再更新帳本與積分；任一步失敗都有明確提示。
+- 若出現“卡片比本機新”，請用“對帳/修復帳本”來同步，避免必須強制扣款。
+- 清空與導入帳本有密碼保護，避免被覆蓋或誤刪。`;
+
+  bindEvents();
+});
+
+/*** 事件綁定 ***/
+function bindEvents(){
+  $("btnRead").addEventListener("click", onRead);
+  $("btnIssue").addEventListener("click", onIssue);
+  $("btnRecharge").addEventListener("click", onRecharge);
+  $("btnSpend").addEventListener("click", ()=>onSpend({force:false}));
+  $("btnForceSpend").addEventListener("click", ()=>onSpend({force:true}));
+  $("btnReconcile").addEventListener("click", onReconcile);
+
+  $("btnExport").addEventListener("click", onExport);
+  $("btnImport").addEventListener("click", onImportSecure);
+  $("btnClear").addEventListener("click", onClearSecure);
+}
+
+/*** 讀卡 ***/
+async function onRead(){
+  try{
+    S.read.textContent = "請貼卡讀取...";
+    const text = await nfcReadOnce();
+    const card = parseCard(text);
+    if (!card) throw new Error("卡格式無效");
+    S.cardView.value = JSON.stringify(card, null, 2);
+    S.read.textContent = `讀卡成功：帳戶=${card.a} 餘額=${card.b} 序號=${card.n} 類型=${card.t} 會員=${card.m}`;
+    S.read.className = "ok";
+  }catch(e){
+    S.read.textContent = "讀卡失敗：" + (e?.message||e);
+    S.read.className = "err";
+  }
+}
+
+/*** 發卡/覆寫 ***/
+async function onIssue(){
+  const t = $("cardType").value; // M/G
+  const m = t==="G" ? 0 : Number($("memberSwitch").value||"0");
+  const amount = Math.max(0, Math.floor(Number($("initAmount").value||0)));
+  const a = newAccountId();
+  const card = { v:1, t, a, b:amount, n:1, m };
+  try{
+    S.issue.textContent = "請貼卡以發卡/覆寫...";
+    await nfcWriteText(JSON.stringify(card));
+    S.issue.textContent = `發卡成功：帳戶=${a} 餘額=${amount} 類型=${t} 會員=${m}`;
+    S.issue.className = "ok";
+    S.cardView.value = JSON.stringify(card, null, 2);
+
+    // 同步帳本影子
+    const ledger = loadLedger();
+    setAcct(ledger, a, { b: card.b, n: card.n, m: card.m, pts:0, exp:0, t:card.t });
+    saveLedger(ledger);
+    refreshLedgerView();
+  }catch(e){
+    S.issue.textContent = "發卡失敗：" + (e?.message||e);
+    S.issue.className = "err";
+  }
+}
+
+/*** 充值（僅儲值卡） ***/
+async function onRecharge(){
+  try{
+    const text = await nfcReadOnce();
+    let card = parseCard(text);
+    if (!card) throw new Error("卡格式無效");
+    if (card.t === "G") { S.issue.textContent = "禮品卡不支持充值。"; S.issue.className="err"; return; }
+    const add = Math.max(0, Math.floor(Number($("initAmount").value||0)));
+    const newCard = { ...card, b: card.b + add, n: card.n + 1 };
+    await nfcWriteText(JSON.stringify(newCard));
+    S.issue.textContent = `充值成功：+${add} 餘額=${newCard.b}`;
+    S.issue.className = "ok";
+    S.cardView.value = JSON.stringify(newCard, null, 2);
+
+    // 更新帳本
+    const ledger = loadLedger();
+    const known = getAcct(ledger, card.a) || { b:card.b, n:card.n, m:card.m, pts:0, exp:0, t:card.t };
+    known.b = newCard.b; known.n = newCard.n; known.m = newCard.m; known.t = newCard.t;
+    setAcct(ledger, card.a, known); saveLedger(ledger); refreshLedgerView();
+  }catch(e){
+    S.issue.textContent = "充值失敗：" + (e?.message||e);
+    S.issue.className = "err";
+  }
+}
+
+/*** 扣款（正常/強制） ***/
+async function onSpend({force}){
+  try{
+    S.spend.textContent = "請貼卡以扣款...";
+    const text = await nfcReadOnce();
+    const card = parseCard(text);
+    if (!card) throw new Error("卡格式無效");
+    const amount = Math.max(0, Math.floor(Number($("spendAmount").value||0)));
+    if (amount<=0) throw new Error("扣款金額需為正整數");
+
+    const ledger = loadLedger();
+    const known = getAcct(ledger, card.a);
+    const ev = evaluateReplay(card, known);
+
+    if (!force && ev.status === "newer") {
+      S.spend.textContent = "檢測到卡片比本機新。建議先點“對帳/修復帳本”再繼續，或使用“強制扣款”。";
+      S.spend.className = "warn";
+      return;
+    }
+    if (!force && ev.status === "suspicious") {
+      S.spend.textContent = "檢測到可疑回放（卡片比本機舊）。如需繼續請使用“強制扣款”（需密碼）。";
+      S.spend.className = "err";
+      return;
+    }
+    if (force) {
+      const pwd = prompt("輸入管理員密碼以執行強制扣款：");
+      if (pwd===null) { S.spend.textContent = "已取消強制扣款"; S.spend.className="muted"; return; }
+      if (pwd!==ADMIN_PASSWORD) { S.spend.textContent = "密碼錯誤，未執行。"; S.spend.className="err"; return; }
+    }
+
+    // 計算積分抵扣（僅儲值卡且會員開啟）
+    const rules = loadRules();
+    let usePts = (card.t==="M" && card.m===1 && $("usePoints").value==="1");
+    let cashOff = 0;
+    if (usePts) {
+      const shadow = known || { pts:0 };
+      cashOff = calcCashOff(shadow, rules, amount);
+    }
+    const pay = Math.max(0, amount - cashOff);
+    if (card.b < amount) { S.spend.textContent = "餘額不足"; S.spend.className="err"; return; }
+
+    // 準備寫卡
+    const newCard = { ...card, b: card.b - amount, n: card.n + 1 };
+    await nfcWriteText(JSON.stringify(newCard)); // 1) 先寫卡成功
+    // 2) 立刻更新帳本與積分
+    try{
+      const acct = known ? { ...known } : { b:card.b, n:card.n, m:card.m, pts:0, exp:0, t:card.t };
+      acct.b = newCard.b; acct.n = newCard.n; acct.m = newCard.m; acct.t = newCard.t;
+      if (card.t==="M" && newCard.m===1) {
+        // 累積基於“實付”pay
+        const earned = awardPoints(acct, rules, pay);
+        // 抵扣積分：現金抵扣僅影響支付，不回寫卡，僅在帳本側扣積分
+        if (usePts && cashOff>0) {
+          const needPts = Math.ceil((cashOff) * 100); // 100分=1元
+          acct.pts = Math.max(0, (acct.pts|0) - needPts);
+        }
+      }
+      setAcct(ledger, card.a, acct);
+      saveLedger(ledger);
+      refreshLedgerView();
+
+      S.spend.textContent = `扣款成功：扣¥${amount}${cashOff?`，積分抵¥${cashOff}`:""}，實付¥${pay}，卡餘¥${newCard.b}。`;
+      S.spend.className = "ok";
+      S.cardView.value = JSON.stringify(newCard, null, 2);
+      // 清理待對帳
+      localStorage.removeItem(LS_PENDING);
+    }catch(e2){
+      // 帳本更新失敗：記錄待對帳
+      try{
+        localStorage.setItem(LS_PENDING, JSON.stringify({
+          a: card.a, b: newCard.b, n: newCard.n, m: newCard.m, t: newCard.t,
+          suggestEarn: (card.t==="M" && newCard.m===1) ? pay : 0,
+          at: nowISO()
+        }));
+      }catch{}
+      S.spend.textContent = "已寫入卡，但更新本機帳本失敗。請點“對帳/修復帳本”同步並補記積分。";
+      S.spend.className = "warn";
+    }
+  }catch(e){
+    S.spend.textContent = "扣款失敗：" + (e?.message||e);
+    S.spend.className = "err";
+  }
+}
+
+/*** 對帳/修復帳本 ***/
+async function onReconcile(){
+  try{
+    S.led.textContent = "請貼卡進行對帳...";
+    const text = await nfcReadOnce();
+    const card = parseCard(text);
+    if (!card) throw new Error("卡格式無效");
+    const ledger = loadLedger();
+    const known = getAcct(ledger, card.a);
+    const ev = evaluateReplay(card, known);
+
+    if (ev.status === "suspicious") {
+      S.led.textContent = "偵測到回放/複製（卡比本機舊），未修復。";
+      S.led.className = "err";
+      return;
+    }
+    // 嘗試使用待對帳建議補分
+    let pend = null;
+    try { pend = JSON.parse(localStorage.getItem(LS_PENDING)||"null"); } catch {}
+    let addEarn = 0;
+    const acct = known ? { ...known } : { b:card.b, n:card.n, m:card.m, pts:0, exp:0, t:card.t };
+    acct.b = card.b; acct.n = card.n; acct.m = card.m; acct.t = card.t;
+
+    if (card.t==="M" && card.m===1) {
+      // 若存在待對帳且匹配帳戶，按記錄建議補記實付
+      const rules = loadRules();
+      if (pend?.a === card.a && (pend?.suggestEarn||0)>0) {
+        addEarn = awardPoints(acct, rules, pend.suggestEarn|0);
+      } else if (known) {
+        // 估算上一筆（正差額代表扣款）
+        const diff = (known.b|0) - (card.b|0);
+        if (diff>0) {
+          addEarn = awardPoints(acct, rules, diff);
+        }
+      }
+    }
+
+    setAcct(ledger, card.a, acct);
+    saveLedger(ledger);
+    refreshLedgerView();
+    if (pend?.a === card.a) localStorage.removeItem(LS_PENDING);
+
+    S.led.textContent = `已修復帳本：帳戶=${card.a} 餘額=${card.b} 序號=${card.n}` + (addEarn?`，補記積分≈${addEarn}`:"");
+    S.led.className = "ok";
+  }catch(e){
+    S.led.textContent = "對帳失敗：" + (e?.message||e);
+    S.led.className = "err";
+  }
+}
+
+/*** 導出/導入/清空 帳本（含密碼） ***/
+function onExport(){
+  try{
+    const ledger = loadLedger();
+    const blob = new Blob([JSON.stringify(ledger,null,2)], {type:"application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `ledger_${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    S.led.textContent = "已導出帳本。";
+    S.led.className = "ok";
+  }catch(e){
+    S.led.textContent = "導出失敗：" + (e?.message||e);
+    S.led.className = "err";
+  }
+}
+
+async function onImportSecure(){
+  try{
+    const pwd = prompt("輸入管理員密碼以導入帳本（將覆蓋同名帳戶）：");
+    if (pwd===null) { S.led.textContent = "已取消導入"; S.led.className="muted"; return; }
+    if (pwd!==ADMIN_PASSWORD) { S.led.textContent = "密碼錯誤，未導入。"; S.led.className="err"; return; }
+
+    const inp = document.createElement("input");
+    inp.type = "file"; inp.accept = "application/json";
+    inp.onchange = ()=>{
+      const f = inp.files?.[0];
+      if (!f) return;
+      const fr = new FileReader();
+      fr.onload = ()=>{
+        try{
+          const incoming = JSON.parse(fr.result);
+          const ledger = loadLedger();
+          ledger.accts = ledger.accts || {};
+          for (const [a, v] of Object.entries(incoming.accts||{})) {
+            ledger.accts[a] = v; // 覆蓋導入
+          }
+          saveLedger(ledger);
+          refreshLedgerView();
+          S.led.textContent = "導入完成。";
+          S.led.className = "ok";
+        }catch(e){
+          S.led.textContent = "導入失敗：" + (e?.message||e);
+          S.led.className = "err";
+        }
+      };
+      fr.readAsText(f);
+    };
+    inp.click();
+  }catch(e){
+    S.led.textContent = "導入失敗：" + (e?.message||e);
+    S.led.className = "err";
+  }
+}
+
+async function onClearSecure(){
+  try{
+    if (!confirm("此操作將刪除本機帳本，且不可恢復。是否繼續？")) { S.led.textContent="已取消"; S.led.className="muted"; return; }
+    const pwd = prompt("請輸入管理員密碼以確認清空帳本：");
+    if (pwd===null) { S.led.textContent="已取消"; S.led.className="muted"; return; }
+    if (pwd!==ADMIN_PASSWORD) { S.led.textContent="密碼錯誤，未清空。"; S.led.className="err"; return; }
+    localStorage.removeItem(LS_LEDGER);
+    localStorage.removeItem(LS_PENDING);
+    S.led.textContent = "已清空本機帳本。";
+    S.led.className = "ok";
+    refreshLedgerView();
+  }catch(e){
+    S.led.textContent = "清空失敗：" + (e?.message||e);
+    S.led.className = "err";
+  }
+}
+</script>
+</body>
+</html>
