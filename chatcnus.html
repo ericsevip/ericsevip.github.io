@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>超信 CH-US（修复解码版）</title>
+<title>超信 CH-US（极简稳定版）</title>
 <style>
 *{box-sizing:border-box}
 body{margin:0;background:#EDEDED;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto}
@@ -20,7 +20,7 @@ button{padding:12px 18px;background:#147DF0;color:white;border:0;border-radius:2
 </style>
 </head>
 <body>
-<div class="topbar">超信 CH-US（修复解码）</div>
+<div class="topbar">超信 CH-US（极简稳定）</div>
 <div class="chat" id="chat"></div>
 <div class="inputbar">
 <input id="input" placeholder="输入消息...">
@@ -30,60 +30,58 @@ button{padding:12px 18px;background:#147DF0;color:white;border:0;border-radius:2
 <script>
 const ctx = new (window.AudioContext || window.webkitAudioContext)();
 const BASE = 18500;
-let buffer = [];
 
-// 编码
-function encode(s) {
-  return Array.from(s).map(c => c.charCodeAt(0) + BASE);
-}
+// 极简发送（你喜欢的刺耳声音）
+async function send() {
+  const text = document.getElementById("input").value.trim();
+  if (!text) return;
+  addMsg(text, true);
+  document.getElementById("input").value = "";
 
-// 发送（你喜欢的刺耳原版声音）
-async function play(freqs) {
-  for (const f of freqs) {
+  // 发送同步头 + 文字
+  for (let i = 0; i < text.length; i++) {
     const o = ctx.createOscillator();
     const g = ctx.createGain();
-    o.frequency.value = f;
+    o.frequency.value = BASE + text.charCodeAt(i);
     o.connect(g);
     g.connect(ctx.destination);
     o.start();
     g.gain.value = 0.7;
-    await new Promise(r => setTimeout(r, 100));
+    await delay(120);
     o.stop();
-    await new Promise(r => setTimeout(r, 30));
+    await delay(40);
   }
 }
 
-// 修复解码（重点！）
-async function start() {
+// 极简监听（必收到）
+async function startListen() {
   const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
   const anal = ctx.createAnalyser();
   anal.fftSize = 4096;
   ctx.createMediaStreamSource(stream).connect(anal);
   const data = new Uint8Array(anal.frequencyBinCount);
+  let buffer = [];
 
   setInterval(() => {
     anal.getByteFrequencyData(data);
-    let maxVal = 0, maxIdx = 0;
+    let max = 0, idx = 0;
     for (let i = 0; i < data.length; i++) {
-      if (data[i] > maxVal) { maxVal = data[i]; maxIdx = i; }
+      if (data[i] > max) { max = data[i]; idx = i; }
     }
-    const freq = (maxIdx * ctx.sampleRate) / (2 * data.length);
-    if (maxVal > 110 && freq >= BASE && freq <= BASE + 2000) {
-      const code = Math.round(freq - BASE);
-      buffer.push(code);
-      if (buffer.length > 8) buffer = buffer.slice(-8);
-      try {
-        const str = String.fromCharCode(...buffer);
-        if (str.length >= 1) {
+    const freq = (idx * ctx.sampleRate) / (2 * data.length);
+    if (max > 100 && freq >= BASE && freq <= BASE + 2000) {
+      buffer.push(Math.round(freq - BASE));
+      if (buffer.length > 6) {
+        try {
+          const str = String.fromCharCode(...buffer);
           addMsg(str, false);
           buffer = [];
-        }
-      } catch (e) {}
+        } catch {}
+      }
     }
-  }, 50);
+  }, 60);
 }
 
-// 显示消息
 function addMsg(text, me) {
   const div = document.createElement("div");
   div.className = "msg " + (me ? "me" : "other");
@@ -92,16 +90,11 @@ function addMsg(text, me) {
   document.getElementById("chat").scrollTop = 99999;
 }
 
-// 发送
-async function send() {
-  const t = document.getElementById("input").value.trim();
-  if (!t) return;
-  addMsg(t, true);
-  document.getElementById("input").value = "";
-  await play(encode(t));
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-start();
+startListen();
 </script>
 </body>
 </html>
